@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Prize Wheel — Embed Demo</title>
+  <style>
+    body { font-family: system-ui, sans-serif; margin: 24px; background: #f1f5f9; color: #0f172a; }
+    h1 { margin-top: 0; }
+    .row { display: flex; flex-wrap: wrap; gap: 16px; align-items: flex-start; }
+    iframe {
+      width: 420px; height: 720px; border: 2px solid #94a3b8; border-radius: 12px;
+      background: #0f172a;
+    }
+    .log {
+      flex: 1; min-width: 260px; max-width: 480px;
+      background: #0f172a; color: #e2e8f0; border-radius: 12px;
+      padding: 16px; font-family: ui-monospace, monospace; font-size: 12px;
+      max-height: 720px; overflow: auto; white-space: pre-wrap;
+    }
+    button {
+      margin: 8px 8px 16px 0; padding: 10px 16px; border: none; border-radius: 8px;
+      background: #0ea5e9; color: white; font-weight: 700; cursor: pointer;
+    }
+  </style>
+</head>
+<body>
+  <h1>Embed demo</h1>
+  <p>Parent page listening for <code>prize-wheel:win</code>. Use the button to send <code>prize-wheel:spin</code>.</p>
+  <button type="button" id="triggerSpin">Trigger spin via postMessage</button>
+  <div class="row">
+    <iframe id="wheel" title="Prize Wheel" src="/?embed=1&mode=prizes&controls=0"></iframe>
+    <pre class="log" id="log">Waiting for messages…
+</pre>
+  </div>
+  <script>
+    const log = document.getElementById('log');
+    const frame = document.getElementById('wheel');
+    function append(line) {
+      log.textContent += line + '\n';
+      log.scrollTop = log.scrollHeight;
+    }
+    window.addEventListener('message', (e) => {
+      if (!e.data || e.data.type !== 'prize-wheel:win') return;
+      append('WIN: ' + JSON.stringify(e.data, null, 2));
+    });
+    document.getElementById('triggerSpin').addEventListener('click', () => {
+      frame.contentWindow.postMessage({ type: 'prize-wheel:spin' }, '*');
+      append('Sent prize-wheel:spin');
+    });
+  </script>
+</body>
+</html>

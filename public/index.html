@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <title>Prize Wheel</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700;800&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="style.css" />
+  <script src="https://telegram.org/js/telegram-web-app.js"></script>
+</head>
+<body>
+  <div class="felt-edge" aria-hidden="true"></div>
+  <div class="app" id="app">
+    <header class="chrome" id="chrome">
+      <div class="brand-mark" aria-hidden="true">♠</div>
+      <h1>Prize Wheel</h1>
+      <p class="subtitle">Fair spins · server-committed · verifiable</p>
+    </header>
+
+    <div class="mode-tabs" id="modeTabs" role="tablist" aria-label="Wheel mode">
+      <button type="button" class="tab active" data-mode="names" role="tab" aria-selected="true">
+        <span class="tab-ico" aria-hidden="true">◎</span> Names
+      </button>
+      <button type="button" class="tab" data-mode="prizes" role="tab" aria-selected="false">
+        <span class="tab-ico" aria-hidden="true">◆</span> Prizes
+      </button>
+    </div>
+
+    <div class="wheel-stage">
+      <div class="wheel-wrap" id="wheelWrap">
+        <div class="wheel-shadow" aria-hidden="true"></div>
+        <div class="wheel-rim" aria-hidden="true">
+          <span class="rim-ticks"></span>
+          <span class="rim-ticks major"></span>
+          <span class="rim-bevel"></span>
+          <span class="rim-shine"></span>
+          <span class="rim-glow"></span>
+        </div>
+        <div class="rim-track" aria-hidden="true">
+          <span class="track-rail outer"></span>
+          <span class="track-groove"></span>
+          <span class="track-rail inner"></span>
+        </div>
+        <div class="pointer" id="pointer" aria-hidden="true">
+          <span class="pointer-cap"></span>
+          <span class="pointer-diamond"></span>
+          <span class="pointer-stem"></span>
+        </div>
+        <canvas id="wheelcanvas" width="440" height="440"></canvas>
+        <div class="wheel-hub" aria-hidden="true">
+          <span class="hub-wood"></span>
+          <span class="hub-metal"></span>
+          <span class="hub-ring"></span>
+          <span class="hub-inner"></span>
+          <span class="hub-gem"></span>
+        </div>
+        <div class="ball-layer" aria-hidden="true">
+          <div class="roulette-ball" id="rouletteBall">
+            <span class="ball-shadow"></span>
+            <span class="ball-sphere">
+              <span class="ball-spec"></span>
+              <span class="ball-spec-2"></span>
+            </span>
+          </div>
+        </div>
+      </div>
+      <p class="empty-hint" id="emptyHint" hidden>Add at least 2 entries to spin</p>
+    </div>
+
+    <div class="controls" id="controls">
+      <div class="spin-row">
+        <button type="button" id="spinBtn" class="btn primary" disabled>
+          <span class="spin-label">SPIN</span>
+        </button>
+        <button type="button" id="muteBtn" class="btn mute" aria-pressed="false" title="Toggle tick sounds" aria-label="Toggle tick sounds">
+          <span class="mute-ico" aria-hidden="true">🔊</span>
+        </button>
+      </div>
+
+      <section class="panel input-panel">
+        <div class="add-row">
+          <input id="itemInput" type="text" maxlength="80" placeholder="Add a name…" autocomplete="off" />
+          <button type="button" id="addBtn" class="btn secondary">Add</button>
+        </div>
+        <ul id="itemList" class="item-list"></ul>
+        <p class="list-empty" id="listEmpty">No entries yet — the wheel shows a sample layout until you add names.</p>
+      </section>
+    </div>
+  </div>
+
+  <div id="winnerOverlay" class="overlay hidden" role="dialog" aria-modal="true" aria-labelledby="winnerLabel">
+    <div class="overlay-card">
+      <div class="overlay-glow" aria-hidden="true"></div>
+      <div class="overlay-rays" aria-hidden="true"></div>
+      <div class="overlay-crown" aria-hidden="true">♛</div>
+      <p class="overlay-kicker">Winner</p>
+      <h2 id="winnerLabel"></h2>
+      <p class="verified">
+        <span class="badge">
+          <svg class="badge-check" viewBox="0 0 16 16" width="12" height="12" aria-hidden="true">
+            <path fill="currentColor" d="M6.5 11.2 3.3 8l1.1-1.1 2.1 2.1 5-5L12.6 5.1z"/>
+          </svg>
+          Verified spin
+        </span>
+        <code id="sigPreview"></code>
+      </p>
+      <button type="button" id="closeOverlay" class="btn secondary">Close</button>
+    </div>
+  </div>
+
+  <script src="vendor/TweenMax.min.js"></script>
+  <script src="vendor/winwheel.min.js"></script>
+  <script src="vendor/confetti.min.js"></script>
+  <script src="script.js"></script>
+  <script src="tg.js"></script>
+</body>
+</html>
