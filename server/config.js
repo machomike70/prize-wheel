@@ -40,6 +40,9 @@ const XAMAN_API_SECRET = env('XAMAN_API_SECRET');
 
 const OWNER_WALLET_ADDRESS = env('OWNER_WALLET_ADDRESS');
 
+/** X (Twitter) API Bearer token for Space scraping (v2 API). */
+const X_BEARER_TOKEN = env('X_BEARER_TOKEN');
+
 const DATA_DIR = process.env.DATA_DIR
   ? require('path').resolve(process.env.DATA_DIR)
   : require('path').join(__dirname, '..', 'data');
@@ -54,5 +57,6 @@ module.exports = {
   XAMAN_API_KEY,
   XAMAN_API_SECRET,
   OWNER_WALLET_ADDRESS,
+  X_BEARER_TOKEN,
   DATA_DIR,
 };

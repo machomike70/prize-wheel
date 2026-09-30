@@ -76,6 +76,41 @@
       </p>
     </header>
 
+    <section class="card" style="border:2px solid var(--accent)">
+      <h2>🎤 Live Space Giveaway</h2>
+      <p class="sub" style="margin-top:0">Everyone in the room spins for prizes. Auto-syncs on load &amp; before each spin.</p>
+      
+      <div class="row" style="align-items:center">
+        <div style="flex:2">
+          <label for="spaceUrl">X Space URL or ID</label>
+          <input id="spaceUrl" type="text" placeholder="https://twitter.com/i/spaces/1AKEmvzOBeeKL or bare ID" />
+        </div>
+        <div style="flex:0;min-width:auto">
+          <button type="button" class="secondary" id="refreshSpace" style="white-space:nowrap">Refresh room</button>
+        </div>
+      </div>
+
+      <div style="display:flex;gap:1rem;align-items:center;margin-bottom:0.75rem;flex-wrap:wrap">
+        <div style="font-size:0.85rem;color:var(--muted)">
+          <strong id="spaceParticipantCount" style="color:var(--accent);font-size:1.1rem">—</strong> in room
+        </div>
+        <div style="font-size:0.8rem;color:var(--muted)" id="spaceLastSync">Not synced yet</div>
+      </div>
+
+      <div style="display:flex;gap:0.65rem;align-items:center">
+        <button type="button" id="spaceGoLive" style="font-size:1.05rem;padding:0.65rem 1.25rem">🎰 Go Live / Spin</button>
+        <span style="font-size:0.8rem;color:var(--muted)">Re-syncs room → spins present set</span>
+      </div>
+
+      <div class="msg" id="spaceMsg"></div>
+      
+      <div id="spaceResult" class="hidden" style="margin-top:0.75rem;padding:0.75rem;border:1px solid var(--line);border-radius:8px;background:#0b1220">
+        <div style="font-size:0.75rem;color:var(--muted);text-transform:uppercase;letter-spacing:0.04em">🏆 Winner</div>
+        <div id="spaceWinner" style="font-size:1.5rem;font-weight:700;color:var(--accent);margin:0.25rem 0 0.5rem"></div>
+        <div style="font-size:0.8rem;color:var(--muted)">Index <span id="spaceIndex"></span> · <span id="spaceTs"></span></div>
+      </div>
+    </section>
+
     <section class="card">
       <h2>Prize list</h2>
       <p class="sub" style="margin-top:0">Server-managed prizes for shop + GOML (fair spins use this list).</p>

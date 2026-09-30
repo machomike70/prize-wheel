@@ -45,7 +45,21 @@ Prize Wheel admin is **not** a separate password allowlist. It accepts the same 
 
 On GOML, open **Admin → Prize Wheel** (iframe to `/wheel/admin`) after signing in as usual. All current GOML admins automatically have access.
 
-**Live giveaways:** use the **Giveaway spin** section — paste contestant names (Names mode) or spin the prize list (Prizes mode). Spins are fair HMAC-signed and do **not** consume shop codes or wallet entitlements. Optionally record the winner.
+### X Space Live Giveaways
+
+The admin page opens with **X Space Giveaway** at the top. It auto-syncs everyone in the configured Space (hosts, speakers, and listeners when available).
+
+**Flow:**
+1. Open `/wheel/admin` — auto-scrapes the saved/default Space URL on load
+2. Shows participant count and last sync time
+3. **Go Live / Spin** button: re-scrapes → syncs Names list (add new, remove who left) → fair-spins only current participants
+4. Winner is broadcast to public watch page (`/?watch=1`) and recorded
+
+**Space URL:** defaults to `https://twitter.com/i/spaces/1AKEmvzOBeeKL` (saved per session). Paste any live Space URL or bare ID.
+
+**Setup:** requires `X_BEARER_TOKEN` in `.env` — get from [X Developer Portal](https://developer.twitter.com/en/portal/dashboard).
+
+**Manual giveaways:** use the **Giveaway spin** section below — paste contestant names (Names mode) or spin the prize list (Prizes mode). Spins are fair HMAC-signed and do **not** consume shop codes or wallet entitlements. Optionally record the winner.
 
 Optional `ADMIN_PASSWORD` is only for shop/API tooling via `X-Admin-Token`, not a GOML gate.
 

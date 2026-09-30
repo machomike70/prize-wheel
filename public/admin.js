@@ -43,6 +43,16 @@
     app: document.getElementById('app'),
     who: document.getElementById('who'),
     rolePill: document.getElementById('rolePill'),
+    spaceUrl: document.getElementById('spaceUrl'),
+    refreshSpace: document.getElementById('refreshSpace'),
+    spaceGoLive: document.getElementById('spaceGoLive'),
+    spaceParticipantCount: document.getElementById('spaceParticipantCount'),
+    spaceLastSync: document.getElementById('spaceLastSync'),
+    spaceMsg: document.getElementById('spaceMsg'),
+    spaceResult: document.getElementById('spaceResult'),
+    spaceWinner: document.getElementById('spaceWinner'),
+    spaceIndex: document.getElementById('spaceIndex'),
+    spaceTs: document.getElementById('spaceTs'),
     prizeList: document.getElementById('prizeList'),
     savePrizes: document.getElementById('savePrizes'),
     prizeMsg: document.getElementById('prizeMsg'),
@@ -104,6 +114,131 @@
     el.className = 'msg ' + (ok ? 'ok' : 'err');
   }
 
+  // ── X Space scraping ────────────────────────────────────────────────────────
+
+  const SPACE_URL_KEY = 'pw_space_url';
+  const SPACE_NAMES_KEY = 'pw_space_names';
+  const DEFAULT_SPACE = 'https://twitter.com/i/spaces/1AKEmvzOBeeKL';
+
+  let currentSpaceNames = [];
+
+  async function scrapeSpace(spaceUrl) {
+    try {
+      const data = await api('/api/admin/spaces/scrape', {
+        method: 'POST',
+        body: JSON.stringify({ spaceUrl }),
+      });
+      return { ok: true, data };
+    } catch (err) {
+      return { ok: false, error: err.message };
+    }
+  }
+
+  async function refreshSpace(silent = false) {
+    const spaceUrl = els.spaceUrl.value.trim() || DEFAULT_SPACE;
+    if (!spaceUrl) {
+      if (!silent) showMsg(els.spaceMsg, 'Enter a Space URL or ID', false);
+      return null;
+    }
+
+    if (!silent) {
+      els.refreshSpace.disabled = true;
+      showMsg(els.spaceMsg, 'Syncing room...', true);
+    }
+
+    const result = await scrapeSpace(spaceUrl);
+
+    if (!silent) els.refreshSpace.disabled = false;
+
+    if (!result.ok) {
+      els.spaceParticipantCount.textContent = '—';
+      els.spaceLastSync.textContent = 'Sync failed';
+      if (!silent) showMsg(els.spaceMsg, result.error, false);
+      currentSpaceNames = [];
+      return null;
+    }
+
+    const { data } = result;
+    currentSpaceNames = data.names || [];
+    sessionStorage.setItem(SPACE_URL_KEY, spaceUrl);
+    sessionStorage.setItem(SPACE_NAMES_KEY, JSON.stringify(currentSpaceNames));
+
+    els.spaceParticipantCount.textContent = String(data.total || currentSpaceNames.length);
+    els.spaceLastSync.textContent = 'Synced ' + new Date().toLocaleTimeString();
+
+    if (!silent) {
+      const hostsCount = data.hosts?.length || 0;
+      const speakersCount = data.speakers?.length || 0;
+      const listenersCount = data.listeners?.length || 0;
+      const detail = listenersCount > 0
+        ? `${hostsCount} host(s), ${speakersCount} speaker(s), ${listenersCount} listener(s)`
+        : `${hostsCount} host(s) + ${speakersCount} speaker(s) (listeners not available via API)`;
+      showMsg(els.spaceMsg, `Synced ${currentSpaceNames.length} participants. ${detail}`, true);
+    }
+
+    return data;
+  }
+
+  async function spaceGoLive() {
+    els.spaceGoLive.disabled = true;
+    showMsg(els.spaceMsg, 'Re-syncing room...', true);
+
+    // Re-scrape to get current room list
+    const spaceData = await refreshSpace(true);
+
+    if (!spaceData || currentSpaceNames.length < 2) {
+      showMsg(els.spaceMsg, 'Need at least 2 participants in the room to spin', false);
+      els.spaceGoLive.disabled = false;
+      return;
+    }
+
+    showMsg(els.spaceMsg, `Synced ${currentSpaceNames.length} participants. Spinning...`, true);
+
+    // Spin with current names
+    const body = {
+      mode: 'names',
+      items: currentSpaceNames,
+      record: true,
+      broadcast: true,
+      note: spaceData.spaceData?.title || 'X Space giveaway',
+    };
+
+    try {
+      const data = await api('/api/admin/spin', {
+        method: 'POST',
+        body: JSON.stringify(body),
+      });
+
+      const label = data.result?.label || '?';
+      els.spaceWinner.textContent = label;
+      els.spaceIndex.textContent = String(data.result?.index ?? '');
+      els.spaceTs.textContent = data.result?.ts
+        ? new Date(data.result.ts).toLocaleString()
+        : '';
+      els.spaceResult.classList.remove('hidden');
+
+      const viewers = typeof data.viewers === 'number' ? data.viewers : null;
+      showMsg(
+        els.spaceMsg,
+        '🎉 Winner: ' +
+          label +
+          ' · ' +
+          currentSpaceNames.length +
+          ' participants' +
+          (viewers != null ? ' · ' + viewers + ' watching live' : ''),
+        true
+      );
+
+      await refreshGiveaways();
+    } catch (err) {
+      showMsg(els.spaceMsg, err.message, false);
+    } finally {
+      els.spaceGoLive.disabled = false;
+    }
+  }
+
+  // ── Boot ─────────────────────────────────────────────────────────────────────
+
   async function boot() {
     if (!hasCreds()) {
       els.gate.classList.remove('hidden');
@@ -120,6 +255,30 @@
       els.who.textContent = addr;
       els.rolePill.textContent = st.role || 'admin-token';
       els.prizeList.value = (st.prizes || []).join('\n');
+
+      // Initialize Space URL from sessionStorage or default
+      const savedSpaceUrl = sessionStorage.getItem(SPACE_URL_KEY) || DEFAULT_SPACE;
+      els.spaceUrl.value = savedSpaceUrl;
+
+      // Restore cached names if available
+      const cachedNames = sessionStorage.getItem(SPACE_NAMES_KEY);
+      if (cachedNames) {
+        try {
+          currentSpaceNames = JSON.parse(cachedNames);
+          if (currentSpaceNames.length > 0) {
+            els.spaceParticipantCount.textContent = String(currentSpaceNames.length);
+            els.spaceLastSync.textContent = 'From cache (refresh to sync)';
+          }
+        } catch {
+          // Ignore parse errors
+        }
+      }
+
+      // Auto-scrape on load if Space URL is set
+      if (savedSpaceUrl) {
+        setTimeout(() => refreshSpace(true), 100);
+      }
+
       await refreshTickets();
       await refreshGiveaways();
       syncGiveawayModeLabel();
@@ -374,6 +533,11 @@
       .replace(/"/g, '&quot;');
   }
 
+  els.spaceUrl.addEventListener('change', () => {
+    sessionStorage.setItem(SPACE_URL_KEY, els.spaceUrl.value.trim());
+  });
+  els.refreshSpace.addEventListener('click', () => refreshSpace(false));
+  els.spaceGoLive.addEventListener('click', spaceGoLive);
   els.savePrizes.addEventListener('click', savePrizes);
   els.mintBtn.addEventListener('click', mint);
   els.refreshTickets.addEventListener('click', refreshTickets);

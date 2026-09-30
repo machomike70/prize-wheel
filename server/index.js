@@ -39,6 +39,7 @@ const liveHub = require('./live');
 const { resolveSite } = require('./site');
 const walletAuth = require('./walletAuth');
 const { parseDiscount } = require('./discount');
+const { parseSpaceId, scrapeSpace, formatParticipantsForGiveaway } = require('./spaces');
 
 const app = express();
 // Behind Caddy — needed for express-rate-limit X-Forwarded-For
@@ -65,6 +66,14 @@ const spinLimiter = rateLimit({
   standardHeaders: true,
   legacyHeaders: false,
   message: { error: 'Too many spins; try again shortly' },
+});
+
+const scrapeLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 10,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Too many scrape requests; try again shortly' },
 });
 
 walletAuth.mount(app);
@@ -441,6 +450,40 @@ app.post('/api/admin/spin', requireAdmin, spinLimiter, (req, res) => {
 app.get('/api/admin/giveaways', requireAdmin, (req, res) => {
   const limit = req.query.limit;
   return res.json({ giveaways: listGiveaways(limit) });
+});
+
+// ── X Space scraping for live giveaways ──────────────────────────────────────
+
+app.post('/api/admin/spaces/scrape', requireAdmin, scrapeLimiter, async (req, res) => {
+  const input = req.body?.spaceUrl || req.body?.spaceId;
+  if (!input) {
+    return res.status(400).json({ error: 'spaceUrl or spaceId required' });
+  }
+
+  const spaceId = parseSpaceId(input);
+  if (!spaceId) {
+    return res.status(400).json({ error: 'Invalid Space URL or ID' });
+  }
+
+  try {
+    const result = await scrapeSpace(spaceId);
+    if (!result.ok) {
+      return res.status(result.status || 502).json({ error: result.error });
+    }
+
+    const names = formatParticipantsForGiveaway(result);
+    return res.json({
+      spaceId: result.spaceId,
+      spaceData: result.spaceData,
+      hosts: result.hosts,
+      speakers: result.speakers,
+      listeners: result.listeners,
+      names,
+      total: result.total,
+    });
+  } catch (err) {
+    return res.status(500).json({ error: err.message || 'Scrape failed' });
+  }
 });
 
 app.get('/api/admin/status', requireAdmin, (req, res) => {
