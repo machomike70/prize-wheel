@@ -47,17 +47,25 @@ On GOML, open **Admin → Prize Wheel** (iframe to `/wheel/admin`) after signing
 
 ### X Space Live Giveaways
 
-The admin page opens with **X Space Giveaway** at the top. It auto-syncs everyone in the configured Space (hosts, speakers, and listeners when available).
+The admin page opens with **X Space Giveaway** at the top. It auto-syncs **everyone in the room** (hosts, speakers, AND listeners) from the configured Space.
 
 **Flow:**
 1. Open `/wheel/admin` — auto-scrapes the saved/default Space URL on load
-2. Shows participant count and last sync time
-3. **Go Live / Spin** button: re-scrapes → syncs Names list (add new, remove who left) → fair-spins only current participants
+2. Shows participant count with breakdown: "X in room: N hosts, N speakers, N listeners"
+3. **Go Live / Spin** button: re-scrapes → syncs Names list (add new arrivals, remove who left) → fair-spins only current participants
 4. Winner is broadcast to public watch page (`/?watch=1`) and recorded
 
 **Space URL:** defaults to `https://twitter.com/i/spaces/1AKEmvzOBeeKL` (saved per session). Paste any live Space URL or bare ID.
 
 **Setup:** requires `X_BEARER_TOKEN` in `.env` — get from [X Developer Portal](https://developer.twitter.com/en/portal/dashboard).
+
+**Scraping Strategy:**
+- **Primary**: AudioSpace GraphQL (unofficial X endpoint) — fetches hosts + speakers + **listeners** (full room)
+- **Fallback**: Official X API v2 — only hosts + speakers if GraphQL fails
+- **Safety**: When listeners unavailable, UI shows warning and blocks spinning unless admin explicitly overrides with "I understand — spin hosts/speakers only" checkbox
+
+**GraphQL Details:**
+The scraper uses X's AudioSpaceById GraphQL endpoint (same method used by community Space tools). This is an **unofficial endpoint** but widely used and stable. Requires only a valid bearer token (same as official API). If X changes the GraphQL schema, the query ID in `server/spaces.js` may need updating.
 
 **Manual giveaways:** use the **Giveaway spin** section below — paste contestant names (Names mode) or spin the prize list (Prizes mode). Spins are fair HMAC-signed and do **not** consume shop codes or wallet entitlements. Optionally record the winner.
 

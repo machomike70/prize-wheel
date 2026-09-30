@@ -47,8 +47,12 @@
     refreshSpace: document.getElementById('refreshSpace'),
     spaceGoLive: document.getElementById('spaceGoLive'),
     spaceParticipantCount: document.getElementById('spaceParticipantCount'),
+    spaceBreakdown: document.getElementById('spaceBreakdown'),
     spaceLastSync: document.getElementById('spaceLastSync'),
     spaceMsg: document.getElementById('spaceMsg'),
+    spaceWarning: document.getElementById('spaceWarning'),
+    spaceWarningText: document.getElementById('spaceWarningText'),
+    spaceOverride: document.getElementById('spaceOverride'),
     spaceResult: document.getElementById('spaceResult'),
     spaceWinner: document.getElementById('spaceWinner'),
     spaceIndex: document.getElementById('spaceIndex'),
@@ -118,9 +122,11 @@
 
   const SPACE_URL_KEY = 'pw_space_url';
   const SPACE_NAMES_KEY = 'pw_space_names';
+  const SPACE_DATA_KEY = 'pw_space_data';
   const DEFAULT_SPACE = 'https://twitter.com/i/spaces/1AKEmvzOBeeKL';
 
   let currentSpaceNames = [];
+  let currentSpaceData = null;
 
   async function scrapeSpace(spaceUrl) {
     try {
@@ -152,28 +158,53 @@
 
     if (!result.ok) {
       els.spaceParticipantCount.textContent = '—';
+      els.spaceBreakdown.textContent = '—';
       els.spaceLastSync.textContent = 'Sync failed';
       if (!silent) showMsg(els.spaceMsg, result.error, false);
       currentSpaceNames = [];
+      currentSpaceData = null;
+      els.spaceWarning.classList.add('hidden');
       return null;
     }
 
     const { data } = result;
     currentSpaceNames = data.names || [];
+    currentSpaceData = data;
+    
     sessionStorage.setItem(SPACE_URL_KEY, spaceUrl);
     sessionStorage.setItem(SPACE_NAMES_KEY, JSON.stringify(currentSpaceNames));
+    sessionStorage.setItem(SPACE_DATA_KEY, JSON.stringify(data));
 
-    els.spaceParticipantCount.textContent = String(data.total || currentSpaceNames.length);
+    // Update counts
+    const hostsCount = data.hosts?.length || 0;
+    const speakersCount = data.speakers?.length || 0;
+    const listenersCount = data.listeners?.length || 0;
+    const total = data.total || currentSpaceNames.length;
+
+    els.spaceParticipantCount.textContent = String(total);
+    
+    // Detailed breakdown
+    const breakdownParts = [];
+    if (hostsCount > 0) breakdownParts.push(`${hostsCount} host${hostsCount !== 1 ? 's' : ''}`);
+    if (speakersCount > 0) breakdownParts.push(`${speakersCount} speaker${speakersCount !== 1 ? 's' : ''}`);
+    if (listenersCount > 0) breakdownParts.push(`${listenersCount} listener${listenersCount !== 1 ? 's' : ''}`);
+    els.spaceBreakdown.textContent = breakdownParts.join(', ') || '—';
+
     els.spaceLastSync.textContent = 'Synced ' + new Date().toLocaleTimeString();
 
-    if (!silent) {
-      const hostsCount = data.hosts?.length || 0;
-      const speakersCount = data.speakers?.length || 0;
-      const listenersCount = data.listeners?.length || 0;
-      const detail = listenersCount > 0
-        ? `${hostsCount} host(s), ${speakersCount} speaker(s), ${listenersCount} listener(s)`
-        : `${hostsCount} host(s) + ${speakersCount} speaker(s) (listeners not available via API)`;
-      showMsg(els.spaceMsg, `Synced ${currentSpaceNames.length} participants. ${detail}`, true);
+    // Show warning if listeners unavailable (hasListeners = false)
+    if (data.hasListeners === false) {
+      els.spaceWarning.classList.remove('hidden');
+      els.spaceWarningText.textContent = data.warning || 'Only hosts + speakers available. Listeners cannot be scraped.';
+      els.spaceOverride.checked = false;
+      if (!silent) {
+        showMsg(els.spaceMsg, `⚠️ INCOMPLETE: ${hostsCount + speakersCount} participants (${hostsCount} hosts, ${speakersCount} speakers). Listeners unavailable.`, false);
+      }
+    } else {
+      els.spaceWarning.classList.add('hidden');
+      if (!silent) {
+        showMsg(els.spaceMsg, `✓ Full room: ${total} participants (${hostsCount} hosts, ${speakersCount} speakers, ${listenersCount} listeners)`, true);
+      }
     }
 
     return data;
@@ -186,11 +217,34 @@
     // Re-scrape to get current room list
     const spaceData = await refreshSpace(true);
 
-    if (!spaceData || currentSpaceNames.length < 2) {
+    if (!spaceData) {
+      showMsg(els.spaceMsg, 'Sync failed. Cannot spin.', false);
+      els.spaceGoLive.disabled = false;
+      return;
+    }
+
+    if (currentSpaceNames.length < 2) {
       showMsg(els.spaceMsg, 'Need at least 2 participants in the room to spin', false);
       els.spaceGoLive.disabled = false;
       return;
     }
+
+    // BLOCKER: check if listeners unavailable and override not checked
+    if (spaceData.hasListeners === false && !els.spaceOverride.checked) {
+      showMsg(
+        els.spaceMsg,
+        '⚠️ BLOCKED: Listeners unavailable. Check override box to spin hosts/speakers only.',
+        false
+      );
+      els.spaceGoLive.disabled = false;
+      // Scroll to warning
+      els.spaceWarning.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      return;
+    }
+
+    const hostsCount = spaceData.hosts?.length || 0;
+    const speakersCount = spaceData.speakers?.length || 0;
+    const listenersCount = spaceData.listeners?.length || 0;
 
     showMsg(els.spaceMsg, `Synced ${currentSpaceNames.length} participants. Spinning...`, true);
 
@@ -218,13 +272,19 @@
       els.spaceResult.classList.remove('hidden');
 
       const viewers = typeof data.viewers === 'number' ? data.viewers : null;
+      const breakdown = spaceData.hasListeners
+        ? `${hostsCount} hosts, ${speakersCount} speakers, ${listenersCount} listeners`
+        : `${hostsCount} hosts, ${speakersCount} speakers (listeners unavailable)`;
+      
       showMsg(
         els.spaceMsg,
         '🎉 Winner: ' +
           label +
           ' · ' +
           currentSpaceNames.length +
-          ' participants' +
+          ' participants (' +
+          breakdown +
+          ')' +
           (viewers != null ? ' · ' + viewers + ' watching live' : ''),
         true
       );
@@ -260,14 +320,24 @@
       const savedSpaceUrl = sessionStorage.getItem(SPACE_URL_KEY) || DEFAULT_SPACE;
       els.spaceUrl.value = savedSpaceUrl;
 
-      // Restore cached names if available
+      // Restore cached data if available
       const cachedNames = sessionStorage.getItem(SPACE_NAMES_KEY);
-      if (cachedNames) {
+      const cachedData = sessionStorage.getItem(SPACE_DATA_KEY);
+      if (cachedNames && cachedData) {
         try {
           currentSpaceNames = JSON.parse(cachedNames);
+          currentSpaceData = JSON.parse(cachedData);
           if (currentSpaceNames.length > 0) {
             els.spaceParticipantCount.textContent = String(currentSpaceNames.length);
-            els.spaceLastSync.textContent = 'From cache (refresh to sync)';
+            const hostsCount = currentSpaceData.hosts?.length || 0;
+            const speakersCount = currentSpaceData.speakers?.length || 0;
+            const listenersCount = currentSpaceData.listeners?.length || 0;
+            const breakdownParts = [];
+            if (hostsCount > 0) breakdownParts.push(`${hostsCount} host${hostsCount !== 1 ? 's' : ''}`);
+            if (speakersCount > 0) breakdownParts.push(`${speakersCount} speaker${speakersCount !== 1 ? 's' : ''}`);
+            if (listenersCount > 0) breakdownParts.push(`${listenersCount} listener${listenersCount !== 1 ? 's' : ''}`);
+            els.spaceBreakdown.textContent = breakdownParts.join(', ') || '—';
+            els.spaceLastSync.textContent = 'From cache (will auto-refresh)';
           }
         } catch {
           // Ignore parse errors

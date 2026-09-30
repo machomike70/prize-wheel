@@ -78,7 +78,7 @@
 
     <section class="card" style="border:2px solid var(--accent)">
       <h2>🎤 Live Space Giveaway</h2>
-      <p class="sub" style="margin-top:0">Everyone in the room spins for prizes. Auto-syncs on load &amp; before each spin.</p>
+      <p class="sub" style="margin-top:0">Everyone in the room (hosts, speakers, listeners) spins for prizes. Auto-syncs on load &amp; before each spin.</p>
       
       <div class="row" style="align-items:center">
         <div style="flex:2">
@@ -94,10 +94,22 @@
         <div style="font-size:0.85rem;color:var(--muted)">
           <strong id="spaceParticipantCount" style="color:var(--accent);font-size:1.1rem">—</strong> in room
         </div>
+        <div style="font-size:0.75rem;color:var(--muted)" id="spaceBreakdown">—</div>
         <div style="font-size:0.8rem;color:var(--muted)" id="spaceLastSync">Not synced yet</div>
       </div>
 
-      <div style="display:flex;gap:0.65rem;align-items:center">
+      <div id="spaceWarning" class="hidden" style="background:#3a1f1b;border:1px solid #8b4513;border-radius:6px;padding:0.65rem 0.75rem;margin-bottom:0.75rem">
+        <div style="font-size:0.85rem;font-weight:600;color:#ff6b6b;margin-bottom:0.25rem">⚠️ Incomplete Room Data</div>
+        <div style="font-size:0.8rem;color:#ffb3b3" id="spaceWarningText">Only hosts + speakers available. Listeners cannot be scraped.</div>
+        <div style="margin-top:0.5rem">
+          <label style="display:flex;align-items:center;gap:0.35rem;cursor:pointer;font-size:0.8rem">
+            <input type="checkbox" id="spaceOverride" style="width:auto;margin:0" />
+            <span>I understand — spin hosts/speakers only anyway</span>
+          </label>
+        </div>
+      </div>
+
+      <div style="display:flex;gap:0.65rem;align-items:center;flex-wrap:wrap">
         <button type="button" id="spaceGoLive" style="font-size:1.05rem;padding:0.65rem 1.25rem">🎰 Go Live / Spin</button>
         <span style="font-size:0.8rem;color:var(--muted)">Re-syncs room → spins present set</span>
       </div>
