@@ -10,7 +10,7 @@ const STORE_PATH = path.join(DATA_DIR, 'store.json');
 
 const DEFAULT_PRIZES = ['10% Off', 'Free Shipping', 'Mystery Gift', 'Try Again'];
 
-/** @type {{ tickets: object[], prizes: string[], updatedAt: number } | null} */
+/** @type {{ tickets: object[], prizes: string[], payoutCodes: object[], updatedAt: number } | null} */
 let cache = null;
 
 function ensureDir() {
@@ -23,6 +23,7 @@ function defaultStore() {
   return {
     tickets: [],
     prizes: DEFAULT_PRIZES.slice(),
+    payoutCodes: [],
     updatedAt: Date.now(),
   };
 }
@@ -44,6 +45,7 @@ function load() {
         Array.isArray(parsed.prizes) && parsed.prizes.length
           ? parsed.prizes.map(String)
           : DEFAULT_PRIZES.slice(),
+      payoutCodes: Array.isArray(parsed.payoutCodes) ? parsed.payoutCodes : [],
       updatedAt: Number(parsed.updatedAt) || Date.now(),
     };
   } catch {
@@ -65,7 +67,7 @@ function persist(store) {
 /**
  * Mutate store synchronously (atomic within single Node process).
  * @template T
- * @param {(store: { tickets: object[], prizes: string[], updatedAt: number }) => T} fn
+ * @param {(store: { tickets: object[], prizes: string[], payoutCodes: object[], updatedAt: number }) => T} fn
  * @returns {T}
  */
 function update(fn) {
@@ -86,6 +88,29 @@ function setPrizes(items) {
   });
 }
 
+function addPayoutCode(codeRecord) {
+  return update((store) => {
+    store.payoutCodes.push(codeRecord);
+    return codeRecord;
+  });
+}
+
+function getPayoutCodes() {
+  return load().payoutCodes.slice();
+}
+
+function cleanExpiredCodes() {
+  const now = Date.now();
+  return update((store) => {
+    const before = store.payoutCodes.length;
+    store.payoutCodes = store.payoutCodes.filter((code) => {
+      return !code.burned && code.expiresAt > now - 24 * 60 * 60 * 1000;
+    });
+    const removed = before - store.payoutCodes.length;
+    return { removed, remaining: store.payoutCodes.length };
+  });
+}
+
 module.exports = {
   DATA_DIR,
   STORE_PATH,
@@ -94,4 +119,7 @@ module.exports = {
   update,
   getPrizes,
   setPrizes,
+  addPayoutCode,
+  getPayoutCodes,
+  cleanExpiredCodes,
 };

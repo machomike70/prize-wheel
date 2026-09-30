@@ -1,0 +1,266 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <title>Claim Prize - Prize Wheel</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700;800&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="style.css" />
+  <style>
+    .claim-container {
+      max-width: 480px;
+      margin: 2rem auto;
+      padding: 2rem;
+    }
+    
+    .claim-card {
+      background: var(--felt-dark);
+      border: 2px solid var(--gold);
+      border-radius: 12px;
+      padding: 2rem;
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+    }
+    
+    .claim-title {
+      font-family: 'Cinzel', serif;
+      font-size: 2rem;
+      color: var(--gold);
+      text-align: center;
+      margin: 0 0 0.5rem;
+    }
+    
+    .claim-subtitle {
+      text-align: center;
+      color: var(--cream);
+      opacity: 0.8;
+      margin: 0 0 2rem;
+    }
+    
+    .code-input-group {
+      margin-bottom: 1.5rem;
+    }
+    
+    .code-input-group label {
+      display: block;
+      color: var(--gold);
+      font-weight: 600;
+      margin-bottom: 0.5rem;
+    }
+    
+    .code-input {
+      width: 100%;
+      padding: 1rem;
+      font-size: 1.25rem;
+      font-family: 'Courier New', monospace;
+      text-align: center;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      border: 2px solid var(--gold);
+      border-radius: 8px;
+      background: rgba(0, 0, 0, 0.3);
+      color: var(--cream);
+      transition: all 0.2s;
+    }
+    
+    .code-input:focus {
+      outline: none;
+      border-color: var(--gold-bright);
+      box-shadow: 0 0 0 3px rgba(212, 175, 55, 0.2);
+    }
+    
+    .code-hint {
+      font-size: 0.875rem;
+      color: var(--cream);
+      opacity: 0.6;
+      margin-top: 0.5rem;
+      text-align: center;
+    }
+    
+    .claim-btn {
+      width: 100%;
+      padding: 1rem;
+      font-size: 1.125rem;
+      font-weight: 700;
+      background: linear-gradient(135deg, var(--gold) 0%, var(--gold-bright) 100%);
+      color: var(--dark-ink);
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    
+    .claim-btn:hover:not(:disabled) {
+      transform: translateY(-2px);
+      box-shadow: 0 4px 12px rgba(212, 175, 55, 0.4);
+    }
+    
+    .claim-btn:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+    
+    .result-message {
+      padding: 1rem;
+      border-radius: 8px;
+      margin-top: 1.5rem;
+      text-align: center;
+      font-weight: 600;
+    }
+    
+    .result-message.success {
+      background: rgba(34, 197, 94, 0.2);
+      border: 2px solid rgb(34, 197, 94);
+      color: rgb(134, 239, 172);
+    }
+    
+    .result-message.error {
+      background: rgba(239, 68, 68, 0.2);
+      border: 2px solid rgb(239, 68, 68);
+      color: rgb(252, 165, 165);
+    }
+    
+    .prize-details {
+      margin-top: 1rem;
+      padding-top: 1rem;
+      border-top: 1px solid rgba(212, 175, 55, 0.3);
+    }
+    
+    .prize-details p {
+      margin: 0.5rem 0;
+      color: var(--cream);
+    }
+    
+    .prize-details strong {
+      color: var(--gold);
+    }
+  </style>
+</head>
+<body>
+  <div class="felt-edge" aria-hidden="true"></div>
+  <div class="app">
+    <header class="chrome">
+      <div class="brand-mark" aria-hidden="true">♠</div>
+      <h1>Prize Wheel</h1>
+      <p class="subtitle">Claim Your Prize</p>
+    </header>
+
+    <div class="claim-container">
+      <div class="claim-card">
+        <h2 class="claim-title">🎉 Claim Prize</h2>
+        <p class="claim-subtitle">Enter your one-time payout code to unlock your NFT</p>
+        
+        <form id="claimForm">
+          <div class="code-input-group">
+            <label for="codeInput">Payout Code</label>
+            <input 
+              type="text" 
+              id="codeInput" 
+              class="code-input"
+              placeholder="XXXXXX-XXXXXX-XXXXXX-XXXXXX"
+              maxlength="35"
+              autocomplete="off"
+              required
+            />
+            <p class="code-hint">Enter the code provided after your winning spin</p>
+          </div>
+          
+          <button type="submit" id="claimBtn" class="claim-btn">
+            Claim Prize
+          </button>
+        </form>
+        
+        <div id="resultMessage"></div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    (() => {
+      'use strict';
+
+      const els = {
+        form: document.getElementById('claimForm'),
+        codeInput: document.getElementById('codeInput'),
+        claimBtn: document.getElementById('claimBtn'),
+        resultMessage: document.getElementById('resultMessage'),
+      };
+
+      // Auto-format code input with dashes
+      els.codeInput.addEventListener('input', (e) => {
+        let value = e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, '');
+        
+        // Format as XXXXXX-XXXXXX-XXXXXX-XXXXXX (6-7-6-7)
+        if (value.length > 6) {
+          value = value.slice(0, 6) + '-' + value.slice(6);
+        }
+        if (value.length > 14) {
+          value = value.slice(0, 14) + '-' + value.slice(14);
+        }
+        if (value.length > 21) {
+          value = value.slice(0, 21) + '-' + value.slice(21);
+        }
+        if (value.length > 29) {
+          value = value.slice(0, 29);
+        }
+        
+        e.target.value = value;
+      });
+
+      els.form.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        
+        const code = els.codeInput.value.trim();
+        if (!code) return;
+        
+        els.claimBtn.disabled = true;
+        els.claimBtn.textContent = 'Processing...';
+        els.resultMessage.innerHTML = '';
+        els.resultMessage.className = 'result-message';
+        
+        try {
+          const res = await fetch('/api/claim', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ code }),
+          });
+          
+          const data = await res.json();
+          
+          if (res.ok && data.success) {
+            els.resultMessage.className = 'result-message success';
+            els.resultMessage.innerHTML = `
+              <p>✅ ${data.message}</p>
+              <div class="prize-details">
+                <p><strong>Winner:</strong> ${escapeHtml(data.winner)}</p>
+                <p><strong>Prize:</strong> ${escapeHtml(data.prize)}</p>
+                <p><strong>Spin ID:</strong> <code>${escapeHtml(data.spinId)}</code></p>
+                ${data.nftRelease ? `<p><strong>NFT Status:</strong> ${escapeHtml(data.nftRelease.status)}</p>` : ''}
+              </div>
+            `;
+            els.codeInput.value = '';
+            els.codeInput.disabled = true;
+          } else {
+            throw new Error(data.error || 'Claim failed');
+          }
+        } catch (err) {
+          els.resultMessage.className = 'result-message error';
+          els.resultMessage.innerHTML = `<p>❌ ${escapeHtml(err.message)}</p>`;
+        } finally {
+          els.claimBtn.disabled = false;
+          els.claimBtn.textContent = 'Claim Prize';
+        }
+      });
+
+      function escapeHtml(s) {
+        return String(s)
+          .replace(/&/g, '&amp;')
+          .replace(/</g, '&lt;')
+          .replace(/>/g, '&gt;')
+          .replace(/"/g, '&quot;');
+      }
+    })();
+  </script>
+</body>
+</html>
