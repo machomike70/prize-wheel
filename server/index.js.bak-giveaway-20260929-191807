@@ -23,19 +23,7 @@ const {
   walletEntitlementStatus,
   normalizeCode,
 } = require('./tickets');
-const {
-  getPrizes,
-  setPrizes,
-  recordGiveaway,
-  listGiveaways,
-  getLive,
-  setLiveReady,
-  setLiveSpin,
-  markLiveDone,
-  clearLive,
-  LIVE_SPIN_DURATION_MS,
-} = require('./store');
-const liveHub = require('./live');
+const { getPrizes, setPrizes } = require('./store');
 const { resolveSite } = require('./site');
 const walletAuth = require('./walletAuth');
 const { parseDiscount } = require('./discount');
@@ -240,20 +228,11 @@ app.post('/api/spin', spinLimiter, (req, res) => {
     }
   }
 
-  // For shop/goml, force server-managed prize list (client cannot change odds).
-  // Admin giveaway spins (adminSpin + requireAdmin creds) may pass mode/items.
+  // For shop/goml, force server-managed prize list (client cannot change odds)
   let body = req.body || {};
-  const adminGiveaway =
-    (body.adminSpin === true || body.adminSpin === 1) &&
-    require('./auth').isAdminRequest(req);
-  if ((site === 'shop' || site === 'goml') && !adminGiveaway) {
+  if (site === 'shop' || site === 'goml') {
     const prizes = getPrizes();
     body = { mode: 'prizes', items: prizes };
-  } else if (adminGiveaway) {
-    const mode = body.mode === 'names' ? 'names' : 'prizes';
-    let items = Array.isArray(body.items) ? body.items : null;
-    if (mode === 'prizes' && (!items || !items.length)) items = getPrizes();
-    body = { mode, items: items || [] };
   }
 
   const norm = normalizeRequest(body);
@@ -312,137 +291,6 @@ function handleVerify(req, res) {
 app.get('/api/verify', handleVerify);
 app.post('/api/verify', handleVerify);
 
-// ── Public live giveaway (watch-only; no wallet / shop gate) ────────────────
-
-app.get('/api/live', (_req, res) => {
-  res.json({
-    live: getLive(),
-    viewers: liveHub.clientCount(),
-  });
-});
-
-app.get('/api/live/stream', (req, res) => {
-  liveHub.subscribe(req, res);
-  // Push current snapshot immediately so late joiners / reconnects sync
-  try {
-    res.write(
-      `event: state\ndata: ${JSON.stringify({ live: getLive() })}\n\n`
-    );
-  } catch {
-    /* client gone */
-  }
-});
-
-app.post('/api/admin/live/ready', requireAdmin, (req, res) => {
-  const mode = req.body?.mode === 'names' ? 'names' : 'prizes';
-  let items = Array.isArray(req.body?.items) ? req.body.items : null;
-  if (mode === 'prizes' && (!items || !items.length)) {
-    items = getPrizes();
-  }
-  const norm = normalizeRequest({ mode, items: items || [] });
-  if (!norm.ok) {
-    return res.status(norm.status).json({ error: norm.error });
-  }
-  const live = setLiveReady({
-    mode: norm.mode,
-    items: norm.items,
-    note: req.body?.note,
-    adminWallet: req.adminWallet || null,
-  });
-  liveHub.broadcast('ready', { live });
-  liveHub.broadcast('state', { live });
-  return res.json({ live });
-});
-
-app.post('/api/admin/live/clear', requireAdmin, (_req, res) => {
-  const live = clearLive();
-  liveHub.broadcast('clear', { live });
-  liveHub.broadcast('state', { live });
-  return res.json({ live });
-});
-
-// ── Admin giveaway spin (no ticket / wallet burn) ───────────────────────────
-
-app.post('/api/admin/spin', requireAdmin, spinLimiter, (req, res) => {
-  const mode = req.body?.mode === 'names' ? 'names' : 'prizes';
-  let items = Array.isArray(req.body?.items) ? req.body.items : null;
-  if (mode === 'prizes' && (!items || !items.length)) {
-    items = getPrizes();
-  }
-
-  const norm = normalizeRequest({ mode, items: items || [] });
-  if (!norm.ok) {
-    return res.status(norm.status).json({ error: norm.error });
-  }
-
-  const out = createSpin(norm.mode, norm.items);
-
-  const shouldRecord =
-    req.body?.record === true ||
-    req.body?.record === 1 ||
-    req.body?.record === '1';
-  let recorded = null;
-  if (shouldRecord) {
-    recorded = recordGiveaway({
-      mode: out.result.mode,
-      winner: out.result.label,
-      index: out.result.index,
-      nonce: out.result.nonce,
-      ts: out.result.ts,
-      signature: out.signature,
-      note: req.body?.note,
-      adminWallet: req.adminWallet || null,
-      itemsCount: out.result.items.length,
-    });
-  }
-
-  // Broadcast to public watchers unless explicitly disabled
-  const broadcast =
-    req.body?.broadcast !== false &&
-    req.body?.broadcast !== 0 &&
-    req.body?.broadcast !== '0';
-  let live = null;
-  if (broadcast) {
-    live = setLiveSpin({
-      mode: out.result.mode,
-      items: out.result.items,
-      index: out.result.index,
-      winner: out.result.label,
-      nonce: out.result.nonce,
-      ts: out.result.ts,
-      signature: out.signature,
-      note: req.body?.note,
-      adminWallet: req.adminWallet || null,
-      durationMs: LIVE_SPIN_DURATION_MS,
-    });
-    liveHub.broadcast('spin', { live });
-    liveHub.broadcast('state', { live });
-    // Flip to done after animation window so late pollers see final state
-    setTimeout(() => {
-      const done = markLiveDone();
-      liveHub.broadcast('done', { live: done });
-      liveHub.broadcast('state', { live: done });
-    }, LIVE_SPIN_DURATION_MS + 200);
-  }
-
-  const discount =
-    out.result.mode === 'prizes' ? parseDiscount(out.result.label) : null;
-
-  return res.json({
-    ...out,
-    giveaway: true,
-    recorded: recorded || undefined,
-    live: live || undefined,
-    viewers: liveHub.clientCount(),
-    discount: discount || undefined,
-  });
-});
-
-app.get('/api/admin/giveaways', requireAdmin, (req, res) => {
-  const limit = req.query.limit;
-  return res.json({ giveaways: listGiveaways(limit) });
-});
-
 app.get('/api/admin/status', requireAdmin, (req, res) => {
   res.json({
     ok: true,
@@ -455,9 +303,6 @@ app.get('/api/admin/status', requireAdmin, (req, res) => {
       goml: listTickets({ site: 'goml' }).length,
       gomlUnused: listTickets({ site: 'goml', unused: true }).length,
     },
-    giveawayCount: listGiveaways(200).length,
-    live: getLive(),
-    liveViewers: liveHub.clientCount(),
   });
 });
 
@@ -465,10 +310,6 @@ app.use(express.static(publicDir));
 
 app.get('/admin', (_req, res) => {
   res.sendFile(path.join(publicDir, 'admin.html'));
-});
-
-app.get(['/live', '/live/'], (_req, res) => {
-  res.sendFile(path.join(publicDir, 'index.html'));
 });
 
 app.get('*', (req, res, next) => {

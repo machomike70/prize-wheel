@@ -1,0 +1,6 @@
+# Prize Wheel reverse proxy — replace YOUR_DOMAIN with the chosen hostname,
+# then include or paste into the Caddyfile. Do not enable until DNS is set.
+#
+# YOUR_DOMAIN {
+#     reverse_proxy localhost:3847
+# }
