@@ -1,0 +1,523 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <title>Hot Wallet Admin - Prize Wheel</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700;800&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="style.css" />
+  <style>
+    .admin-container {
+      max-width: 1200px;
+      margin: 2rem auto;
+      padding: 1rem;
+    }
+    
+    .model-section {
+      background: var(--felt-dark);
+      border: 2px solid var(--gold);
+      border-radius: 12px;
+      padding: 2rem;
+      margin-bottom: 2rem;
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+    }
+    
+    .section-title {
+      font-family: 'Cinzel', serif;
+      font-size: 1.75rem;
+      color: var(--gold);
+      margin: 0 0 0.5rem;
+    }
+    
+    .section-subtitle {
+      color: var(--cream);
+      opacity: 0.8;
+      margin: 0 0 1.5rem;
+      font-size: 0.9rem;
+    }
+    
+    .info-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+      gap: 1rem;
+      margin: 1.5rem 0;
+    }
+    
+    .info-card {
+      background: rgba(0, 0, 0, 0.3);
+      border: 1px solid var(--gold);
+      border-radius: 8px;
+      padding: 1rem;
+    }
+    
+    .info-label {
+      font-size: 0.875rem;
+      color: var(--gold);
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      margin-bottom: 0.5rem;
+    }
+    
+    .info-value {
+      font-family: 'Courier New', monospace;
+      font-size: 1rem;
+      color: var(--cream);
+      word-break: break-all;
+    }
+    
+    .deposit-instructions {
+      background: rgba(59, 130, 246, 0.15);
+      border: 2px solid rgb(59, 130, 246);
+      border-radius: 8px;
+      padding: 1.5rem;
+      margin: 1.5rem 0;
+    }
+    
+    .deposit-instructions h4 {
+      color: rgb(147, 197, 253);
+      margin: 0 0 1rem;
+    }
+    
+    .deposit-instructions ol {
+      margin: 0;
+      padding-left: 1.5rem;
+      color: rgb(147, 197, 253);
+    }
+    
+    .deposit-instructions li {
+      margin: 0.5rem 0;
+    }
+    
+    .table-container {
+      overflow-x: auto;
+      margin: 1.5rem 0;
+    }
+    
+    table {
+      width: 100%;
+      border-collapse: collapse;
+    }
+    
+    th {
+      background: rgba(212, 175, 55, 0.2);
+      color: var(--gold);
+      padding: 0.75rem;
+      text-align: left;
+      font-weight: 600;
+      font-size: 0.875rem;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+    
+    td {
+      padding: 0.75rem;
+      border-bottom: 1px solid rgba(212, 175, 55, 0.2);
+      color: var(--cream);
+      font-size: 0.875rem;
+    }
+    
+    tbody tr:hover {
+      background: rgba(212, 175, 55, 0.1);
+    }
+    
+    .badge {
+      display: inline-block;
+      padding: 0.25rem 0.5rem;
+      border-radius: 4px;
+      font-size: 0.75rem;
+      font-weight: 600;
+      text-transform: uppercase;
+    }
+    
+    .badge.available {
+      background: rgba(34, 197, 94, 0.3);
+      color: rgb(134, 239, 172);
+    }
+    
+    .badge.distributed {
+      background: rgba(156, 163, 175, 0.3);
+      color: rgb(209, 213, 219);
+    }
+    
+    .btn-small {
+      padding: 0.5rem 1rem;
+      font-size: 0.875rem;
+      font-weight: 600;
+      background: var(--gold);
+      color: var(--dark-ink);
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    
+    .btn-small:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 2px 8px rgba(212, 175, 55, 0.4);
+    }
+    
+    .btn-small:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+    
+    .refresh-btn {
+      float: right;
+      padding: 0.5rem 1rem;
+      background: rgba(212, 175, 55, 0.2);
+      color: var(--gold);
+      border: 1px solid var(--gold);
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 0.875rem;
+    }
+    
+    code {
+      background: rgba(0, 0, 0, 0.3);
+      padding: 0.125rem 0.375rem;
+      border-radius: 3px;
+      font-size: 0.875rem;
+    }
+  </style>
+</head>
+<body>
+  <div class="felt-edge" aria-hidden="true"></div>
+  <div class="app">
+    <header class="chrome">
+      <div class="brand-mark" aria-hidden="true">♠</div>
+      <h1>Prize Wheel</h1>
+      <p class="subtitle">Hot Wallet Administration</p>
+    </header>
+
+    <div class="admin-container">
+      <!-- Auth Prompt -->
+      <div id="authPrompt" class="auth-prompt" style="display: none;">
+        <h3>🔐 Admin Authentication</h3>
+        <p style="color: var(--cream); opacity: 0.8; margin-bottom: 1rem;">
+          Enter your admin token to access hot wallet controls
+        </p>
+        <input type="password" id="tokenInput" placeholder="Admin Token" />
+        <button type="button" id="authBtn">Authenticate</button>
+        <p id="authError" style="color: rgb(252, 165, 165); margin-top: 1rem;"></p>
+      </div>
+
+      <div id="mainPanel" style="display: none;">
+        <!-- Model A: GOML Shared Hot Wallet -->
+        <div class="model-section">
+          <h2 class="section-title">🏦 Model A: GOML Shared Hot Wallet</h2>
+          <p class="section-subtitle">
+            <strong>Server-held wallet</strong> - Seed stored securely in server environment. 
+            Sponsors deposit NFTs/tokens to this address. GOML signs distributions.
+          </p>
+
+          <div id="hotWalletStatus"></div>
+
+          <div class="deposit-instructions">
+            <h4>📥 Deposit Instructions for Sponsors</h4>
+            <ol>
+              <li>Send NFTs or tokens to the address above</li>
+              <li>Include a memo/tag to identify your deposit (optional)</li>
+              <li>Deposits will appear in the Inventory table below</li>
+              <li>Admin assigns items to specific giveaways</li>
+              <li>Winners receive prizes directly from this wallet</li>
+            </ol>
+          </div>
+
+          <h3 style="color: var(--gold); margin: 2rem 0 1rem;">Inventory</h3>
+          <button type="button" class="refresh-btn" onclick="loadInventory()">🔄 Refresh</button>
+          <div class="table-container" style="clear: both;">
+            <table id="inventoryTable">
+              <thead>
+                <tr>
+                  <th>Label</th>
+                  <th>Type</th>
+                  <th>Token/NFT ID</th>
+                  <th>Sponsor</th>
+                  <th>Status</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody id="inventoryBody">
+                <tr><td colspan="6" style="text-align: center; opacity: 0.6;">Loading...</td></tr>
+              </tbody>
+            </table>
+          </div>
+
+          <h3 style="color: var(--gold); margin: 2rem 0 1rem;">Recent Distributions</h3>
+          <button type="button" class="refresh-btn" onclick="loadDistributions()">🔄 Refresh</button>
+          <div class="table-container" style="clear: both;">
+            <table id="distributionsTable">
+              <thead>
+                <tr>
+                  <th>Date</th>
+                  <th>Item</th>
+                  <th>Destination</th>
+                  <th>TX Hash</th>
+                  <th>Result</th>
+                </tr>
+              </thead>
+              <tbody id="distributionsBody">
+                <tr><td colspan="5" style="text-align: center; opacity: 0.6;">Loading...</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- Model B: Client-Side Sponsor Wallets -->
+        <div class="model-section">
+          <h2 class="section-title">👤 Model B: Client-Side Sponsor Wallets</h2>
+          <p class="section-subtitle">
+            <strong>Sponsor-held wallets</strong> - Keys generated in sponsor's browser, NEVER sent to GOML server. 
+            Sponsors manage their own wallets and sign distributions themselves.
+          </p>
+
+          <div class="info-banner" style="margin-bottom: 1.5rem;">
+            <p><strong>ℹ️ How it works:</strong></p>
+            <p>• Sponsors generate wallets at <a href="/wallet.html" target="_blank" style="color: var(--gold);">/wallet.html</a></p>
+            <p>• GOML stores ONLY public address + label (no seeds/private keys)</p>
+            <p>• Sponsors keep their own backup and sign transactions in their browser</p>
+            <p>• No GOML custody or recovery possible</p>
+          </div>
+
+          <h3 style="color: var(--gold); margin: 2rem 0 1rem;">Registered Sponsor Wallets</h3>
+          <button type="button" class="refresh-btn" onclick="loadSponsorWallets()">🔄 Refresh</button>
+          <div class="table-container" style="clear: both;">
+            <table id="sponsorWalletsTable">
+              <thead>
+                <tr>
+                  <th>Label</th>
+                  <th>Address</th>
+                  <th>Network</th>
+                  <th>Registered</th>
+                  <th>Type</th>
+                </tr>
+              </thead>
+              <tbody id="sponsorWalletsBody">
+                <tr><td colspan="5" style="text-align: center; opacity: 0.6;">Loading...</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    (() => {
+      'use strict';
+
+      let adminToken = sessionStorage.getItem('adminToken');
+
+      function checkAuth() {
+        if (adminToken) {
+          document.getElementById('authPrompt').style.display = 'none';
+          document.getElementById('mainPanel').style.display = 'block';
+          loadAllData();
+        } else {
+          document.getElementById('authPrompt').style.display = 'block';
+          document.getElementById('mainPanel').style.display = 'none';
+        }
+      }
+
+      document.getElementById('authBtn').addEventListener('click', () => {
+        const token = document.getElementById('tokenInput').value.trim();
+        if (!token) {
+          document.getElementById('authError').textContent = 'Please enter a token';
+          return;
+        }
+        
+        adminToken = token;
+        sessionStorage.setItem('adminToken', token);
+        document.getElementById('authError').textContent = '';
+        document.getElementById('tokenInput').value = '';
+        checkAuth();
+      });
+
+      async function loadAllData() {
+        await loadHotWalletInfo();
+        await loadInventory();
+        await loadDistributions();
+        await loadSponsorWallets();
+      }
+
+      async function loadHotWalletInfo() {
+        try {
+          const [infoRes, accountRes] = await Promise.all([
+            fetch('/api/hotwallet/info'),
+            fetch('/api/hotwallet/account', {
+              headers: { 'X-Admin-Token': adminToken }
+            })
+          ]);
+
+          const info = await infoRes.json();
+          const account = accountRes.ok ? await accountRes.json() : null;
+
+          const statusHtml = `
+            <div class="info-grid">
+              <div class="info-card">
+                <div class="info-label">📬 Deposit Address</div>
+                <div class="info-value">${info.address || 'Not configured'}</div>
+              </div>
+              <div class="info-card">
+                <div class="info-label">🌐 Network</div>
+                <div class="info-value">${info.network || 'N/A'}</div>
+              </div>
+              <div class="info-card">
+                <div class="info-label">💰 Balance</div>
+                <div class="info-value">${account?.balance || '0'} XRP</div>
+              </div>
+              <div class="info-card">
+                <div class="info-label">📊 Status</div>
+                <div class="info-value">${account?.funded === false ? '⚠️ Needs funding' : '✅ Active'}</div>
+              </div>
+            </div>
+          `;
+
+          document.getElementById('hotWalletStatus').innerHTML = statusHtml;
+        } catch (err) {
+          document.getElementById('hotWalletStatus').innerHTML = `
+            <p style="color: rgb(252, 165, 165);">Error loading hot wallet: ${err.message}</p>
+          `;
+        }
+      }
+
+      window.loadInventory = async function() {
+        try {
+          const res = await fetch('/api/hotwallet/inventory', {
+            headers: { 'X-Admin-Token': adminToken }
+          });
+
+          if (!res.ok) throw new Error('Failed to load inventory');
+
+          const data = await res.json();
+          const items = data.items || [];
+
+          if (items.length === 0) {
+            document.getElementById('inventoryBody').innerHTML = `
+              <tr><td colspan="6" style="text-align: center; opacity: 0.6;">No inventory items yet</td></tr>
+            `;
+            return;
+          }
+
+          document.getElementById('inventoryBody').innerHTML = items.map(item => `
+            <tr>
+              <td>${escapeHtml(item.label)}</td>
+              <td>${escapeHtml(item.type).toUpperCase()}</td>
+              <td><code>${escapeHtml(item.tokenId || item.amount || 'N/A')}</code></td>
+              <td>${escapeHtml(item.sponsor || 'N/A')}</td>
+              <td>
+                <span class="badge ${item.distributed ? 'distributed' : 'available'}">
+                  ${item.distributed ? 'Distributed' : 'Available'}
+                </span>
+              </td>
+              <td>
+                <button 
+                  type="button" 
+                  class="btn-small" 
+                  onclick="distributeItem('${item.id}')"
+                  ${item.distributed ? 'disabled' : ''}
+                >
+                  ${item.distributed ? '✓ Sent' : '📤 Distribute'}
+                </button>
+              </td>
+            </tr>
+          `).join('');
+        } catch (err) {
+          document.getElementById('inventoryBody').innerHTML = `
+            <tr><td colspan="6" style="text-align: center; color: rgb(252, 165, 165);">Error: ${err.message}</td></tr>
+          `;
+        }
+      };
+
+      window.distributeItem = async function(itemId) {
+        const destination = prompt('Enter winner XRPL address:');
+        if (!destination) return;
+
+        const spinId = prompt('Enter spin ID (optional):') || '';
+
+        try {
+          const res = await fetch('/api/hotwallet/distribute', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'X-Admin-Token': adminToken
+            },
+            body: JSON.stringify({ itemId, destination, spinId })
+          });
+
+          const data = await res.json();
+
+          if (!res.ok) throw new Error(data.error);
+
+          alert(`✅ Distribution successful!\n\nTX Hash: ${data.txHash}\n\nView on explorer:\n${data.explorerUrl}`);
+          
+          await loadInventory();
+          await loadDistributions();
+        } catch (err) {
+          alert(`❌ Distribution failed: ${err.message}`);
+        }
+      };
+
+      window.loadDistributions = async function() {
+        try {
+          const res = await fetch('/api/hotwallet/distributions', {
+            headers: { 'X-Admin-Token': adminToken }
+          });
+
+          if (!res.ok) throw new Error('Failed to load distributions');
+
+          const data = await res.json();
+          const dists = data.distributions || [];
+
+          if (dists.length === 0) {
+            document.getElementById('distributionsBody').innerHTML = `
+              <tr><td colspan="5" style="text-align: center; opacity: 0.6;">No distributions yet</td></tr>
+            `;
+            return;
+          }
+
+          document.getElementById('distributionsBody').innerHTML = dists.slice(0, 10).reverse().map(dist => `
+            <tr>
+              <td>${new Date(dist.createdAt).toLocaleString()}</td>
+              <td><code>${dist.itemId}</code></td>
+              <td><code>${escapeHtml(dist.destination).slice(0, 16)}...</code></td>
+              <td>
+                <a href="${dist.txHash.startsWith('http') ? dist.txHash : '#'}" target="_blank" style="color: var(--gold);">
+                  ${escapeHtml(dist.txHash).slice(0, 12)}...
+                </a>
+              </td>
+              <td>${escapeHtml(dist.txResult)}</td>
+            </tr>
+          `).join('');
+        } catch (err) {
+          document.getElementById('distributionsBody').innerHTML = `
+            <tr><td colspan="5" style="text-align: center; color: rgb(252, 165, 165);">Error: ${err.message}</td></tr>
+          `;
+        }
+      };
+
+      window.loadSponsorWallets = async function() {
+        // TODO: Implement sponsor wallets endpoint
+        document.getElementById('sponsorWalletsBody').innerHTML = `
+          <tr><td colspan="5" style="text-align: center; opacity: 0.6;">
+            Sponsor wallets are generated client-side at <a href="/wallet.html" style="color: var(--gold);">/wallet.html</a>
+          </td></tr>
+        `;
+      };
+
+      function escapeHtml(s) {
+        return String(s)
+          .replace(/&/g, '&amp;')
+          .replace(/</g, '&lt;')
+          .replace(/>/g, '&gt;')
+          .replace(/"/g, '&quot;');
+      }
+
+      checkAuth();
+    })();
+  </script>
+</body>
+</html>

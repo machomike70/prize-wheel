@@ -1,0 +1,523 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <title>Giveaway Admin - Prize Wheel</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700;800&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="style.css" />
+  <style>
+    .giveaway-container {
+      max-width: 640px;
+      margin: 2rem auto;
+      padding: 1rem;
+    }
+    
+    .admin-panel {
+      background: var(--felt-dark);
+      border: 2px solid var(--gold);
+      border-radius: 12px;
+      padding: 2rem;
+      margin-bottom: 1.5rem;
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+    }
+    
+    .admin-title {
+      font-family: 'Cinzel', serif;
+      font-size: 1.75rem;
+      color: var(--gold);
+      margin: 0 0 0.5rem;
+    }
+    
+    .admin-subtitle {
+      color: var(--cream);
+      opacity: 0.8;
+      margin: 0 0 1.5rem;
+    }
+    
+    .names-textarea {
+      width: 100%;
+      min-height: 200px;
+      padding: 1rem;
+      font-family: 'Inter', sans-serif;
+      font-size: 1rem;
+      border: 2px solid var(--gold);
+      border-radius: 8px;
+      background: rgba(0, 0, 0, 0.3);
+      color: var(--cream);
+      resize: vertical;
+    }
+    
+    .names-textarea:focus {
+      outline: none;
+      border-color: var(--gold-bright);
+      box-shadow: 0 0 0 3px rgba(212, 175, 55, 0.2);
+    }
+    
+    .input-hint {
+      font-size: 0.875rem;
+      color: var(--cream);
+      opacity: 0.6;
+      margin-top: 0.5rem;
+    }
+    
+    .giveaway-btn {
+      width: 100%;
+      padding: 1rem;
+      font-size: 1.25rem;
+      font-weight: 700;
+      background: linear-gradient(135deg, var(--gold) 0%, var(--gold-bright) 100%);
+      color: var(--dark-ink);
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      transition: all 0.2s;
+      margin-top: 1rem;
+    }
+    
+    .giveaway-btn:hover:not(:disabled) {
+      transform: translateY(-2px);
+      box-shadow: 0 4px 12px rgba(212, 175, 55, 0.4);
+    }
+    
+    .giveaway-btn:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+    
+    .result-panel {
+      background: var(--felt-dark);
+      border: 2px solid var(--gold-bright);
+      border-radius: 12px;
+      padding: 2rem;
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+      animation: slideIn 0.3s ease-out;
+    }
+    
+    @keyframes slideIn {
+      from {
+        opacity: 0;
+        transform: translateY(-20px);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+    
+    .winner-badge {
+      text-align: center;
+      margin-bottom: 1.5rem;
+    }
+    
+    .winner-badge .emoji {
+      font-size: 3rem;
+      display: block;
+      margin-bottom: 0.5rem;
+    }
+    
+    .winner-badge .title {
+      font-family: 'Cinzel', serif;
+      font-size: 1.5rem;
+      color: var(--gold-bright);
+      margin: 0;
+    }
+    
+    .winner-name {
+      font-size: 2rem;
+      font-weight: 700;
+      color: var(--cream);
+      text-align: center;
+      margin: 1rem 0;
+      padding: 1rem;
+      background: rgba(212, 175, 55, 0.1);
+      border-radius: 8px;
+    }
+    
+    .code-display {
+      background: rgba(0, 0, 0, 0.5);
+      border: 2px solid var(--gold);
+      border-radius: 8px;
+      padding: 1.5rem;
+      margin: 1.5rem 0;
+    }
+    
+    .code-label {
+      font-size: 0.875rem;
+      color: var(--gold);
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      margin-bottom: 0.75rem;
+    }
+    
+    .code-value {
+      font-family: 'Courier New', monospace;
+      font-size: 1.5rem;
+      color: var(--gold-bright);
+      text-align: center;
+      letter-spacing: 0.1em;
+      word-break: break-all;
+      user-select: all;
+      cursor: text;
+    }
+    
+    .code-actions {
+      display: flex;
+      gap: 0.75rem;
+      margin-top: 0.75rem;
+    }
+    
+    .copy-btn, .qr-btn {
+      flex: 1;
+      padding: 0.75rem;
+      font-size: 0.875rem;
+      font-weight: 600;
+      background: rgba(212, 175, 55, 0.2);
+      color: var(--gold);
+      border: 1px solid var(--gold);
+      border-radius: 6px;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    
+    .copy-btn:hover, .qr-btn:hover {
+      background: rgba(212, 175, 55, 0.3);
+    }
+    
+    .warning-box {
+      background: rgba(239, 68, 68, 0.15);
+      border: 2px solid rgb(239, 68, 68);
+      border-radius: 8px;
+      padding: 1rem;
+      margin-top: 1.5rem;
+    }
+    
+    .warning-box .icon {
+      font-size: 1.25rem;
+      margin-right: 0.5rem;
+    }
+    
+    .warning-box p {
+      margin: 0.5rem 0;
+      color: rgb(252, 165, 165);
+      font-size: 0.875rem;
+    }
+    
+    .meta-info {
+      margin-top: 1.5rem;
+      padding-top: 1.5rem;
+      border-top: 1px solid rgba(212, 175, 55, 0.3);
+    }
+    
+    .meta-info p {
+      margin: 0.5rem 0;
+      font-size: 0.875rem;
+      color: var(--cream);
+      opacity: 0.7;
+    }
+    
+    .meta-info code {
+      background: rgba(0, 0, 0, 0.3);
+      padding: 0.125rem 0.375rem;
+      border-radius: 3px;
+      font-size: 0.8125rem;
+    }
+    
+    .error-message {
+      background: rgba(239, 68, 68, 0.2);
+      border: 2px solid rgb(239, 68, 68);
+      border-radius: 8px;
+      padding: 1.5rem;
+      color: rgb(252, 165, 165);
+      text-align: center;
+      margin-top: 1rem;
+    }
+    
+    .auth-prompt {
+      background: var(--felt-dark);
+      border: 2px solid var(--gold);
+      border-radius: 12px;
+      padding: 2rem;
+      text-align: center;
+    }
+    
+    .auth-prompt h3 {
+      color: var(--gold);
+      margin: 0 0 1rem;
+    }
+    
+    .auth-prompt input {
+      width: 100%;
+      max-width: 320px;
+      padding: 0.75rem;
+      font-family: 'Courier New', monospace;
+      text-align: center;
+      border: 2px solid var(--gold);
+      border-radius: 8px;
+      background: rgba(0, 0, 0, 0.3);
+      color: var(--cream);
+      margin-bottom: 1rem;
+    }
+    
+    .auth-prompt button {
+      padding: 0.75rem 2rem;
+      font-weight: 600;
+      background: var(--gold);
+      color: var(--dark-ink);
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+    }
+  </style>
+</head>
+<body>
+  <div class="felt-edge" aria-hidden="true"></div>
+  <div class="app">
+    <header class="chrome">
+      <div class="brand-mark" aria-hidden="true">♠</div>
+      <h1>Prize Wheel</h1>
+      <p class="subtitle">Giveaway Admin</p>
+    </header>
+
+    <div class="giveaway-container">
+      <div id="authPrompt" class="auth-prompt" style="display: none;">
+        <h3>🔐 Admin Authentication</h3>
+        <p style="color: var(--cream); opacity: 0.8; margin-bottom: 1rem;">
+          Enter your admin token to access giveaway controls
+        </p>
+        <input type="password" id="tokenInput" placeholder="Admin Token" />
+        <button type="button" id="authBtn">Authenticate</button>
+        <p id="authError" style="color: rgb(252, 165, 165); margin-top: 1rem;"></p>
+      </div>
+
+      <div id="mainPanel" style="display: none;">
+        <div class="admin-panel">
+          <h2 class="admin-title">🎲 Run Giveaway Spin</h2>
+          <p class="admin-subtitle">
+            Enter participant names or X handles (one per line) to run a fair spin and generate a payout code
+          </p>
+          
+          <form id="giveawayForm">
+            <textarea 
+              id="namesInput" 
+              class="names-textarea"
+              placeholder="@alice&#10;@bob&#10;@charlie&#10;@diana"
+              required
+            ></textarea>
+            <p class="input-hint">One name per line (minimum 2 participants)</p>
+            
+            <button type="submit" id="spinBtn" class="giveaway-btn">
+              🎯 Run Fair Spin
+            </button>
+          </form>
+        </div>
+
+        <div id="resultPanel" style="display: none;"></div>
+      </div>
+    </div>
+  </div>
+
+  <script src="vendor/confetti.min.js"></script>
+  <script>
+    (() => {
+      'use strict';
+
+      let adminToken = sessionStorage.getItem('adminToken');
+
+      const els = {
+        authPrompt: document.getElementById('authPrompt'),
+        mainPanel: document.getElementById('mainPanel'),
+        tokenInput: document.getElementById('tokenInput'),
+        authBtn: document.getElementById('authBtn'),
+        authError: document.getElementById('authError'),
+        giveawayForm: document.getElementById('giveawayForm'),
+        namesInput: document.getElementById('namesInput'),
+        spinBtn: document.getElementById('spinBtn'),
+        resultPanel: document.getElementById('resultPanel'),
+      };
+
+      function checkAuth() {
+        if (adminToken) {
+          els.authPrompt.style.display = 'none';
+          els.mainPanel.style.display = 'block';
+        } else {
+          els.authPrompt.style.display = 'block';
+          els.mainPanel.style.display = 'none';
+        }
+      }
+
+      els.authBtn.addEventListener('click', () => {
+        const token = els.tokenInput.value.trim();
+        if (!token) {
+          els.authError.textContent = 'Please enter a token';
+          return;
+        }
+        
+        adminToken = token;
+        sessionStorage.setItem('adminToken', token);
+        els.authError.textContent = '';
+        els.tokenInput.value = '';
+        checkAuth();
+      });
+
+      els.giveawayForm.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        
+        const namesText = els.namesInput.value.trim();
+        if (!namesText) return;
+        
+        const names = namesText
+          .split('\n')
+          .map(s => s.trim())
+          .filter(s => s.length > 0);
+        
+        if (names.length < 2) {
+          alert('Please enter at least 2 names');
+          return;
+        }
+        
+        els.spinBtn.disabled = true;
+        els.spinBtn.textContent = '⏳ Running fair spin...';
+        els.resultPanel.style.display = 'none';
+        
+        try {
+          const res = await fetch('/api/giveaway/spin', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'X-Admin-Token': adminToken,
+            },
+            body: JSON.stringify({
+              mode: 'names',
+              items: names,
+            }),
+          });
+          
+          const data = await res.json();
+          
+          if (!res.ok) {
+            if (res.status === 403) {
+              sessionStorage.removeItem('adminToken');
+              adminToken = null;
+              checkAuth();
+              throw new Error('Invalid admin token');
+            }
+            throw new Error(data.error || 'Spin failed');
+          }
+          
+          displayResult(data);
+          fireConfetti();
+        } catch (err) {
+          els.resultPanel.style.display = 'block';
+          els.resultPanel.innerHTML = `
+            <div class="error-message">
+              <strong>❌ Error:</strong> ${escapeHtml(err.message)}
+            </div>
+          `;
+        } finally {
+          els.spinBtn.disabled = false;
+          els.spinBtn.textContent = '🎯 Run Fair Spin';
+        }
+      });
+
+      function displayResult(data) {
+        const expiresAt = new Date(data.payoutExpiresAt);
+        const expiresIn = Math.round((data.payoutExpiresAt - Date.now()) / 60000);
+        
+        els.resultPanel.innerHTML = `
+          <div class="result-panel">
+            <div class="winner-badge">
+              <span class="emoji">🏆</span>
+              <h3 class="title">Winner Selected!</h3>
+            </div>
+            
+            <div class="winner-name">
+              ${escapeHtml(data.result.label)}
+            </div>
+            
+            <div class="code-display">
+              <div class="code-label">🎟️ One-Time Payout Code</div>
+              <div class="code-value" id="codeValue">${escapeHtml(data.payoutCodeDisplay)}</div>
+              <div class="code-actions">
+                <button type="button" class="copy-btn" onclick="copyCode()">
+                  📋 Copy Code
+                </button>
+                <button type="button" class="qr-btn" onclick="openClaimPage()">
+                  🔗 Open Claim Page
+                </button>
+              </div>
+            </div>
+            
+            <div class="warning-box">
+              <p>
+                <span class="icon">⚠️</span>
+                <strong>IMPORTANT:</strong> This code will be shown only once!
+              </p>
+              <p>
+                • Save it securely and share it with the winner<br>
+                • Valid for ${expiresIn} minutes (expires ${expiresAt.toLocaleTimeString()})<br>
+                • Single-use only - cannot be reused after redemption<br>
+                • Winner claims at: <code>${location.origin}/claim.html</code>
+              </p>
+            </div>
+            
+            <div class="meta-info">
+              <p><strong>Spin ID:</strong> <code>${escapeHtml(data.result.nonce)}</code></p>
+              <p><strong>Signature:</strong> <code>${escapeHtml(data.signature.slice(0, 16))}...</code></p>
+              <p><strong>Timestamp:</strong> ${new Date(data.result.ts).toLocaleString()}</p>
+            </div>
+          </div>
+        `;
+        
+        els.resultPanel.style.display = 'block';
+        els.resultPanel.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      }
+
+      window.copyCode = function() {
+        const codeEl = document.getElementById('codeValue');
+        if (!codeEl) return;
+        
+        const code = codeEl.textContent;
+        navigator.clipboard.writeText(code).then(() => {
+          const btn = event.target.closest('.copy-btn');
+          const originalText = btn.textContent;
+          btn.textContent = '✅ Copied!';
+          setTimeout(() => {
+            btn.textContent = originalText;
+          }, 2000);
+        }).catch(err => {
+          alert('Failed to copy: ' + err.message);
+        });
+      };
+
+      window.openClaimPage = function() {
+        window.open('/claim.html', '_blank');
+      };
+
+      function fireConfetti() {
+        if (typeof confetti !== 'function') return;
+        
+        confetti({
+          particleCount: 100,
+          spread: 70,
+          origin: { y: 0.6 },
+          colors: ['#d4af37', '#f0d78c', '#c41e3a', '#ffffff'],
+        });
+      }
+
+      function escapeHtml(s) {
+        return String(s)
+          .replace(/&/g, '&amp;')
+          .replace(/</g, '&lt;')
+          .replace(/>/g, '&gt;')
+          .replace(/"/g, '&quot;');
+      }
+
+      checkAuth();
+    })();
+  </script>
+</body>
+</html>
