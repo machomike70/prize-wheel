@@ -1,0 +1,268 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="robots" content="noindex, nofollow" />
+  <title>Prize Wheel Admin</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --bg: #0b1220; --card: #121a2b; --text: #e8eef8; --muted: #9aa8bd;
+      --accent: #d4af37; --line: #243049; --ok: #3dd68c; --err: #f07178;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0; font-family: Inter, system-ui, sans-serif;
+      background: var(--bg); color: var(--text); line-height: 1.5;
+      padding: 1.25rem;
+    }
+    h1 { font-size: 1.35rem; margin: 0 0 0.25rem; }
+    h2 { font-size: 1rem; margin: 0 0 0.75rem; letter-spacing: 0.04em; text-transform: uppercase; color: var(--accent); }
+    .sub { color: var(--muted); font-size: 0.9rem; margin-bottom: 1.25rem; }
+    .card {
+      background: var(--card); border: 1px solid var(--line);
+      border-radius: 10px; padding: 1rem 1.1rem; margin-bottom: 1rem;
+    }
+    label { display: block; font-size: 0.8rem; color: var(--muted); margin-bottom: 0.25rem; }
+    input, select, textarea {
+      width: 100%; background: #0b1220; border: 1px solid var(--line);
+      color: var(--text); border-radius: 6px; padding: 0.55rem 0.65rem; margin-bottom: 0.65rem;
+      font: inherit;
+    }
+    textarea { min-height: 110px; resize: vertical; }
+    .row { display: flex; flex-wrap: wrap; gap: 0.65rem; align-items: flex-end; }
+    .row > * { flex: 1; min-width: 120px; }
+    button {
+      background: var(--accent); color: #1a1204; border: 0; border-radius: 6px;
+      padding: 0.55rem 0.9rem; font-weight: 700; cursor: pointer; font: inherit;
+    }
+    button.secondary { background: transparent; color: var(--text); border: 1px solid var(--line); }
+    button:disabled { opacity: 0.5; cursor: not-allowed; }
+    .msg { font-size: 0.85rem; margin-top: 0.5rem; }
+    .msg.ok { color: var(--ok); }
+    .msg.err { color: var(--err); }
+    table { width: 100%; border-collapse: collapse; font-size: 0.82rem; }
+    th, td { text-align: left; padding: 0.4rem 0.35rem; border-bottom: 1px solid var(--line); }
+    th { color: var(--muted); font-weight: 600; }
+    code { font-size: 0.85em; }
+    .gate {
+      max-width: 420px; margin: 3rem auto; text-align: center;
+    }
+    .gate a { color: var(--accent); }
+    .hidden { display: none !important; }
+    .pill {
+      display: inline-block; font-size: 0.75rem; padding: 0.15rem 0.5rem;
+      border-radius: 999px; border: 1px solid var(--line); color: var(--muted);
+    }
+    .pill.ok { color: var(--ok); border-color: rgba(61,214,140,0.4); }
+  </style>
+</head>
+<body>
+  <div id="gate" class="gate card hidden">
+    <h1>Prize Wheel Admin</h1>
+    <p class="sub">Uses the same GOML admin session. Sign in on the GOML Admin page first, then reopen this panel.</p>
+    <p><a id="gomlAdminLink" href="/admin">Open GOML Admin</a></p>
+    <p class="msg err" id="gateMsg"></p>
+  </div>
+
+  <div id="app" class="hidden">
+    <header style="margin-bottom:1rem">
+      <h1>Prize Wheel Admin</h1>
+      <p class="sub">
+        GOML session · <span id="who"></span>
+        <span class="pill ok" id="rolePill"></span>
+      </p>
+    </header>
+
+    <section class="card" style="border:2px solid var(--accent)">
+      <h2>🎤 Live Space Giveaway</h2>
+      <p class="sub" style="margin-top:0">Everyone in the room (hosts, speakers, listeners) spins for prizes. Auto-syncs on load &amp; before each spin.</p>
+      
+      <div class="row" style="align-items:center">
+        <div style="flex:2">
+          <label for="spaceUrl">X Space URL or ID</label>
+          <input id="spaceUrl" type="text" placeholder="https://twitter.com/i/spaces/1AKEmvzOBeeKL or bare ID" />
+        </div>
+        <div style="flex:0;min-width:auto">
+          <button type="button" class="secondary" id="refreshSpace" style="white-space:nowrap">Refresh room</button>
+        </div>
+      </div>
+
+      <div style="display:flex;gap:1rem;align-items:center;margin-bottom:0.75rem;flex-wrap:wrap">
+        <div style="font-size:0.85rem;color:var(--muted)">
+          <strong id="spaceParticipantCount" style="color:var(--accent);font-size:1.1rem">—</strong> in room
+        </div>
+        <div style="font-size:0.75rem;color:var(--muted)" id="spaceBreakdown">—</div>
+        <div style="font-size:0.8rem;color:var(--muted)" id="spaceLastSync">Not synced yet</div>
+      </div>
+
+      <div id="spaceWarning" class="hidden" style="background:#3a1f1b;border:1px solid #8b4513;border-radius:6px;padding:0.65rem 0.75rem;margin-bottom:0.75rem">
+        <div style="font-size:0.85rem;font-weight:600;color:#ff6b6b;margin-bottom:0.25rem">⚠️ Incomplete Room Data</div>
+        <div style="font-size:0.8rem;color:#ffb3b3" id="spaceWarningText">Only hosts + speakers available. Listeners cannot be scraped.</div>
+        <div style="margin-top:0.5rem">
+          <label style="display:flex;align-items:center;gap:0.35rem;cursor:pointer;font-size:0.8rem">
+            <input type="checkbox" id="spaceOverride" style="width:auto;margin:0" />
+            <span>I understand — spin hosts/speakers only anyway</span>
+          </label>
+        </div>
+      </div>
+
+      <div style="display:flex;gap:0.65rem;align-items:center;flex-wrap:wrap">
+        <button type="button" id="spaceGoLive" style="font-size:1.05rem;padding:0.65rem 1.25rem">🎰 Go Live / Spin</button>
+        <span style="font-size:0.8rem;color:var(--muted)">Re-syncs room → spins present set</span>
+      </div>
+
+      <div class="msg" id="spaceMsg"></div>
+      
+      <div id="spaceResult" class="hidden" style="margin-top:0.75rem;padding:0.75rem;border:1px solid var(--line);border-radius:8px;background:#0b1220">
+        <div style="font-size:0.75rem;color:var(--muted);text-transform:uppercase;letter-spacing:0.04em">🏆 Winner</div>
+        <div id="spaceWinner" style="font-size:1.5rem;font-weight:700;color:var(--accent);margin:0.25rem 0 0.5rem"></div>
+        <div style="font-size:0.8rem;color:var(--muted)">Index <span id="spaceIndex"></span> · <span id="spaceTs"></span></div>
+      </div>
+    </section>
+
+    <section class="card">
+      <h2>Prize list</h2>
+      <p class="sub" style="margin-top:0">Server-managed prizes for shop + GOML (fair spins use this list).</p>
+      <textarea id="prizeList" placeholder="One prize per line"></textarea>
+      <button type="button" id="savePrizes">Save prizes</button>
+      <div class="msg" id="prizeMsg"></div>
+    </section>
+
+
+    <section class="card">
+      <h2>Giveaway spin</h2>
+      <p class="sub" style="margin-top:0">Live giveaways — fair HMAC spin with admin auth. Broadcasts to the public homepage watch wheel (no wallet gate for viewers).</p>
+      <div class="row">
+        <div>
+          <label for="giveawayMode">Mode</label>
+          <select id="giveawayMode">
+            <option value="names">Names (contestants)</option>
+            <option value="prizes">Prizes (server list or custom)</option>
+          </select>
+        </div>
+        <div>
+          <label for="giveawayRecord">Record winner</label>
+          <select id="giveawayRecord">
+            <option value="1">yes</option>
+            <option value="0">no</option>
+          </select>
+        </div>
+      </div>
+      <div class="row" style="margin-bottom:0.75rem">
+        <div>
+          <label for="giveawayBroadcast">Broadcast to homepage</label>
+          <select id="giveawayBroadcast">
+            <option value="1" selected>Yes — audience watches live</option>
+            <option value="0">No — admin-only result</option>
+          </select>
+        </div>
+        <div>
+          <label>Public watch URL</label>
+          <input type="text" readonly id="giveawayWatchUrl" value="/wheel/?watch=1&embed=1&controls=0" />
+        </div>
+      </div>
+      <label for="giveawayItems" id="giveawayItemsLabel">Contestant names (one per line)</label>
+      <textarea id="giveawayItems" placeholder="Alice&#10;Bob&#10;Carol"></textarea>
+      <div>
+        <label for="giveawayNote">Note (optional)</label>
+        <input id="giveawayNote" type="text" maxlength="200" placeholder="e.g. Friday Twitter giveaway" />
+      </div>
+      <div class="row">
+        <div style="flex:0">
+          <button type="button" id="giveawaySpinBtn">Spin giveaway (live)</button>
+        </div>
+        <div style="flex:0">
+          <button type="button" class="secondary" id="giveawayUsePrizes">Load prize list</button>
+          <button type="button" class="secondary" id="giveawayPushLive">Push names to live</button>
+          <button type="button" class="secondary" id="giveawayClearLive">Clear live</button>
+        </div>
+      </div>
+      <div class="msg" id="giveawayMsg"></div>
+      <div id="giveawayResult" class="hidden" style="margin-top:0.75rem;padding:0.75rem;border:1px solid var(--line);border-radius:8px;background:#0b1220">
+        <div style="font-size:0.75rem;color:var(--muted);text-transform:uppercase;letter-spacing:0.04em">Winner</div>
+        <div id="giveawayWinner" style="font-size:1.35rem;font-weight:700;color:var(--accent);margin:0.25rem 0 0.5rem"></div>
+        <div style="font-size:0.8rem;color:var(--muted)">Index <span id="giveawayIndex"></span> · <span id="giveawayTs"></span></div>
+        <label for="giveawayProof" style="margin-top:0.5rem">Signed proof (payload + signature)</label>
+        <textarea id="giveawayProof" readonly style="min-height:90px;font-size:0.75rem;font-family:ui-monospace,monospace"></textarea>
+        <button type="button" class="secondary" id="giveawayCopyProof" style="margin-top:0.35rem">Copy proof</button>
+      </div>
+      <div style="margin-top:1rem">
+        <h2 style="font-size:0.85rem">Recent giveaways</h2>
+        <div style="overflow:auto;max-height:200px">
+          <table>
+            <thead>
+              <tr><th>When</th><th>Mode</th><th>Winner</th><th>Note</th></tr>
+            </thead>
+            <tbody id="giveawayBody"></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <section class="card">
+      <h2>Mint spin tickets</h2>
+      <div class="row">
+        <div>
+          <label for="site">Site</label>
+          <select id="site">
+            <option value="shop">shop (code per purchase)</option>
+            <option value="goml">goml (wallet / entitlement)</option>
+          </select>
+        </div>
+        <div>
+          <label for="count">Count</label>
+          <input id="count" type="number" min="1" max="200" value="1" />
+        </div>
+        <div>
+          <label for="orderId">Order ID (optional)</label>
+          <input id="orderId" type="text" maxlength="120" placeholder="Shopify / order ref" />
+        </div>
+      </div>
+      <div>
+        <label for="walletBind">Bind wallet (GOML optional)</label>
+        <input id="walletBind" type="text" placeholder="rXXXXXXXX…" />
+      </div>
+      <button type="button" id="mintBtn">Mint tickets</button>
+      <div class="msg" id="mintMsg"></div>
+      <pre id="mintOut" style="white-space:pre-wrap;font-size:0.8rem;color:var(--muted)"></pre>
+    </section>
+
+    <section class="card">
+      <h2>Recent tickets</h2>
+      <div class="row">
+        <div>
+          <label for="filterSite">Filter site</label>
+          <select id="filterSite">
+            <option value="">all</option>
+            <option value="shop">shop</option>
+            <option value="goml">goml</option>
+          </select>
+        </div>
+        <div>
+          <label for="filterUnused">Unused only</label>
+          <select id="filterUnused">
+            <option value="1">yes</option>
+            <option value="">all</option>
+          </select>
+        </div>
+        <div>
+          <button type="button" class="secondary" id="refreshTickets">Refresh</button>
+        </div>
+      </div>
+      <div style="overflow:auto;max-height:320px">
+        <table>
+          <thead>
+            <tr><th>Code</th><th>Site</th><th>Wallet</th><th>Order</th><th>Used</th><th>Prize</th></tr>
+          </thead>
+          <tbody id="ticketBody"></tbody>
+        </table>
+      </div>
+    </section>
+  </div>
+
+  <script src="admin.js"></script>
+</body>
+</html>

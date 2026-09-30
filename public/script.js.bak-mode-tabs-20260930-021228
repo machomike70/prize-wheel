@@ -36,21 +36,12 @@
   const MUTE_KEY = 'prize-wheel:mute';
 
   const params = new URLSearchParams(location.search);
-  const pathLower = (location.pathname || '').toLowerCase();
-  const watchMode =
-    params.get('watch') === '1' ||
-    params.get('watch') === 'true' ||
-    /\/live\/?$/.test(pathLower) ||
-    pathLower.includes('/live/') ||
-    pathLower.endsWith('/live');
-  const embed = params.get('embed') === '1' || watchMode;
+  const embed = params.get('embed') === '1';
   const autoclose = params.get('autoclose') === '1';
-  const controlsOff = params.get('controls') === '0' || watchMode;
+  const controlsOff = params.get('controls') === '0';
   const modeParam = params.get('mode');
 
   function detectSite() {
-    // Public watch / live embed: never apply shop or GOML wallet gates
-    if (watchMode) return 'open';
     const q = params.get('site');
     if (q === 'shop' || q === 'goml') return q;
     const host = location.hostname.toLowerCase();
@@ -123,7 +114,6 @@
 
   if (embed) document.body.classList.add('embed');
   if (controlsOff) document.body.classList.add('controls-hidden');
-  if (watchMode) document.body.classList.add('watch-mode');
   if (siteMode === 'shop' || siteMode === 'goml') {
     document.body.classList.add('site-locked', 'site-' + siteMode);
   }
@@ -257,10 +247,6 @@
   }
 
   function updateSpinEnabled() {
-    if (watchMode) {
-      if (els.spinBtn) els.spinBtn.disabled = true;
-      return;
-    }
     let ok = !spinning && currentItems().length >= 2 && !showingSamples;
     if (siteMode === 'shop' && shopWalletMode) {
       ok = ok && gomlReady && Boolean(gomlWallet) && !shopLockedAfterSpin;
@@ -956,21 +942,15 @@
   }
 
   async function requestSpin() {
-    if (watchMode) return;
-    if (spinning) return;
+    const items = currentItems();
+    if (items.length < 2 || spinning) return;
+    if (showingSamples) return;
     if (siteMode === 'shop' && shopWalletMode) {
       if (!gomlReady || !gomlWallet || shopLockedAfterSpin) return;
     } else if (siteMode === 'shop' && (!shopUnlocked || shopLockedAfterSpin)) {
       return;
     }
     if (siteMode === 'goml' && (!gomlReady || !gomlWallet)) return;
-
-    // Fair-spin sites: switch UI back to server prizes so segment indices match
-    if (!ensureServerPrizesForFairSpin()) return;
-
-    const items = currentItems();
-    if (items.length < 2) return;
-    if (showingSamples) return;
 
     spinning = true;
     updateSpinEnabled();
@@ -1069,38 +1049,10 @@
   function setMode(mode) {
     if (spinning || (mode !== 'names' && mode !== 'prizes')) return;
     state.mode = mode;
-    // On shop/goml, Prizes mode always reflects the server-managed list
-    if (mode === 'prizes' && serverPrizes && serverPrizes.length >= 2) {
-      state.prizes = serverPrizes.slice();
-    }
     saveState();
     updateTabs();
     updateList();
     buildWheel();
-  }
-
-  /** Shop/GOML fair spins ignore client mode; keep wheel on server prizes before spin. */
-  function ensureServerPrizesForFairSpin() {
-    if (siteMode !== 'shop' && siteMode !== 'goml') return true;
-    if (!serverPrizes || serverPrizes.length < 2) return false;
-    var needsSync = state.mode !== 'prizes';
-    if (!needsSync) {
-      if (state.prizes.length !== serverPrizes.length) needsSync = true;
-      else {
-        for (var i = 0; i < serverPrizes.length; i++) {
-          if (state.prizes[i] !== serverPrizes[i]) { needsSync = true; break; }
-        }
-      }
-    }
-    if (needsSync) {
-      state.mode = 'prizes';
-      state.prizes = serverPrizes.slice();
-      saveState();
-      updateTabs();
-      updateList();
-      buildWheel();
-    }
-    return true;
   }
 
   // Events
@@ -1165,234 +1117,9 @@
     els.xrplChallengeBtn.addEventListener('click', () => startXrplChallenge());
   }
 
-  // ── Public live giveaway watch (SSE + poll fallback) ───────────────────────
-
-  let lastLiveId = null;
-  let lastLiveNonce = null;
-  let liveEs = null;
-  let livePollTimer = null;
-
-  function applyLiveItems(mode, items) {
-    if (mode !== 'names' && mode !== 'prizes') return false;
-    if (!Array.isArray(items) || items.length < 2) return false;
-    state.mode = mode;
-    if (mode === 'names') state.names = items.map(String);
-    else state.prizes = items.map(String);
-    updateTabs();
-    updateList();
-    buildWheel();
-    return true;
-  }
-
-  function parkOnIndex(index) {
-    if (!theWheel || !Number.isInteger(index) || index < 0) return;
-    const prizeNumber = index + 1;
-    try {
-      const stopAngle = theWheel.getRandomForSegment(prizeNumber);
-      ballStopAngle = stopAngle;
-      // Near-instant spinToStop so Winwheel lands the pointer on the segment
-      theWheel.animation.duration = 0.05;
-      theWheel.animation.spins = 0;
-      theWheel.animation.easing = 'Power0.easeNone';
-      theWheel.animation.direction = 'clockwise';
-      theWheel.animation.stopAngle = stopAngle;
-      theWheel.startAnimation();
-      // Ensure ball is pocketed after the micro-tween
-      setTimeout(() => {
-        try {
-          const { pocket } = ballRadii();
-          positionBall(theWheel.rotationAngle + ballStopAngle, pocket);
-          if (els.ball) {
-            els.ball.classList.remove('rolling');
-            els.ball.classList.add('dropped');
-          }
-        } catch { /* ignore */ }
-      }, 80);
-    } catch (err) {
-      console.warn('parkOnIndex', err);
-    }
-  }
-
-  /**
-   * Play (or catch up on) a server-broadcast giveaway spin.
-   * @param {object} live
-   * @param {{ forceRestart?: boolean }} [opts]
-   */
-  function playLiveSpin(live, opts) {
-    opts = opts || {};
-    if (!live || !Array.isArray(live.items) || live.items.length < 2) return;
-    if (!Number.isInteger(live.index) || live.index < 0 || live.index >= live.items.length) {
-      return;
-    }
-
-    const sameSpin =
-      live.nonce && live.nonce === lastLiveNonce && live.id && live.id === lastLiveId;
-    if (sameSpin && spinning && !opts.forceRestart) return;
-
-    lastLiveId = live.id || lastLiveId;
-    lastLiveNonce = live.nonce || lastLiveNonce;
-
-    const startedAt = live.startedAt || live.ts || Date.now();
-    const durationMs = live.durationMs || SPIN_DURATION * 1000;
-    const elapsed = Date.now() - startedAt;
-    const remainingMs = durationMs - elapsed;
-
-    applyLiveItems(live.mode, live.items);
-
-    // Too late / already done — park on winner; onSpinFinished shows overlay
-    if (live.status === 'done' || remainingMs < 1200) {
-      if (spinning) {
-        try { theWheel.stopAnimation(false); } catch { /* ignore */ }
-        killBallTween();
-        spinning = false;
-      }
-      lastProof = live.signature
-        ? {
-            result: {
-              mode: live.mode,
-              items: live.items,
-              index: live.index,
-              label: live.winner || live.items[live.index],
-              nonce: live.nonce,
-              ts: live.ts,
-            },
-            signature: live.signature,
-          }
-        : {
-            result: {
-              mode: live.mode,
-              items: live.items,
-              index: live.index,
-              label: live.winner || live.items[live.index],
-              nonce: live.nonce,
-              ts: live.ts,
-            },
-            signature: '',
-          };
-      parkOnIndex(live.index);
-      updateSpinEnabled();
-      return;
-    }
-
-    if (spinning && !opts.forceRestart) return;
-
-    spinning = true;
-    updateSpinEnabled();
-    hideWinner();
-    lastProof = live.signature
-      ? {
-          result: {
-            mode: live.mode,
-            items: live.items,
-            index: live.index,
-            label: live.winner,
-            nonce: live.nonce,
-            ts: live.ts,
-          },
-          signature: live.signature,
-        }
-      : null;
-    if (els.pointer) els.pointer.classList.remove('tick', 'land');
-
-    const prizeNumber = live.index + 1;
-    const stopAngle = theWheel.getRandomForSegment(prizeNumber);
-    const durationSec = Math.max(1.5, remainingMs / 1000);
-    const spins = Math.max(2, Math.round(SPIN_TURNS * (durationSec / SPIN_DURATION)));
-    theWheel.animation.duration = durationSec;
-    theWheel.animation.spins = spins;
-    theWheel.animation.easing = 'Power2.easeOut';
-    theWheel.animation.direction = 'clockwise';
-    theWheel.animation.stopAngle = stopAngle;
-    startBallAnimation(stopAngle);
-    theWheel.startAnimation();
-  }
-
-  function handleLiveState(live) {
-    if (!live || !live.status || live.status === 'idle') {
-      return;
-    }
-    if (live.status === 'ready') {
-      if (spinning) return;
-      if (Array.isArray(live.items) && live.items.length >= 2) {
-        applyLiveItems(live.mode, live.items);
-        hideWinner();
-      }
-      lastLiveId = live.id || lastLiveId;
-      return;
-    }
-    if (live.status === 'spinning' || live.status === 'done') {
-      playLiveSpin(live);
-    }
-  }
-
-  async function fetchLiveOnce() {
-    try {
-      const res = await fetch(apiUrl('/api/live'), { cache: 'no-store' });
-      if (!res.ok) return;
-      const data = await res.json();
-      if (data && data.live) handleLiveState(data.live);
-    } catch {
-      /* ignore */
-    }
-  }
-
-  function connectLiveStream() {
-    if (liveEs) {
-      try { liveEs.close(); } catch { /* ignore */ }
-      liveEs = null;
-    }
-    try {
-      liveEs = new EventSource(apiUrl('/api/live/stream'));
-    } catch {
-      return;
-    }
-
-    function onPayload(ev) {
-      try {
-        const data = JSON.parse(ev.data);
-        if (data && data.live) handleLiveState(data.live);
-      } catch {
-        /* ignore */
-      }
-    }
-
-    liveEs.addEventListener('state', onPayload);
-    liveEs.addEventListener('spin', onPayload);
-    liveEs.addEventListener('ready', onPayload);
-    liveEs.addEventListener('done', onPayload);
-    liveEs.addEventListener('clear', onPayload);
-    liveEs.onerror = () => {
-      // EventSource reconnects automatically; poll covers gaps
-    };
-  }
-
-  function startWatchMode() {
-    // Watch-only UI: no gate, no local edits, no spin button
-    if (els.siteGate) els.siteGate.hidden = true;
-    if (els.chrome) {
-      /* optional banner via CSS */
-    }
-    const banner = document.getElementById('watchBanner');
-    if (banner) banner.hidden = false;
-
-    // Disable local item editing / spin
-    if (els.spinBtn) els.spinBtn.disabled = true;
-    if (els.addBtn) els.addBtn.disabled = true;
-    if (els.itemInput) els.itemInput.disabled = true;
-
-    fetchLiveOnce();
-    connectLiveStream();
-    livePollTimer = setInterval(fetchLiveOnce, 4000);
-  }
-
   syncMuteUi();
   updateTabs();
   updateList();
   buildWheel();
-  if (watchMode) {
-    startWatchMode();
-    updateSpinEnabled();
-  } else {
-    initSiteMode().then(() => updateSpinEnabled());
-  }
+  initSiteMode().then(() => updateSpinEnabled());
 })();

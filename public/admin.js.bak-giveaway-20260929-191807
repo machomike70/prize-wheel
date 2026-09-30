@@ -1,0 +1,207 @@
+(() => {
+  'use strict';
+
+  const WALLET_TOKEN_KEY = 'goml_wallet_token';
+  const ADMIN_TOKEN_KEY = 'goml_admin_token';
+  const WALLET_ADDR_KEY = 'goml_wallet_addr';
+  const WALLET_ROLE_KEY = 'goml_wallet_role';
+
+  // When embedded under /wheel* on GOML, sessionStorage is same-origin.
+  // Also accept ?token= for tooling (not shown in UI).
+  const params = new URLSearchParams(location.search);
+
+  function apiBase() {
+    // Works both at / and behind handle_path /wheel*
+    const path = location.pathname;
+    if (path.startsWith('/wheel')) return '/wheel';
+    return '';
+  }
+
+  function authHeaders() {
+    const h = { 'Content-Type': 'application/json' };
+    const wallet =
+      sessionStorage.getItem(WALLET_TOKEN_KEY) ||
+      localStorage.getItem(WALLET_TOKEN_KEY) ||
+      params.get('walletToken');
+    const admin =
+      sessionStorage.getItem(ADMIN_TOKEN_KEY) ||
+      localStorage.getItem(ADMIN_TOKEN_KEY) ||
+      params.get('adminToken');
+    if (wallet) h['X-Wallet-Token'] = wallet;
+    else if (admin) h['X-Admin-Token'] = admin;
+    return h;
+  }
+
+  function hasCreds() {
+    const h = authHeaders();
+    return Boolean(h['X-Wallet-Token'] || h['X-Admin-Token']);
+  }
+
+  const els = {
+    gate: document.getElementById('gate'),
+    gateMsg: document.getElementById('gateMsg'),
+    app: document.getElementById('app'),
+    who: document.getElementById('who'),
+    rolePill: document.getElementById('rolePill'),
+    prizeList: document.getElementById('prizeList'),
+    savePrizes: document.getElementById('savePrizes'),
+    prizeMsg: document.getElementById('prizeMsg'),
+    site: document.getElementById('site'),
+    count: document.getElementById('count'),
+    orderId: document.getElementById('orderId'),
+    walletBind: document.getElementById('walletBind'),
+    mintBtn: document.getElementById('mintBtn'),
+    mintMsg: document.getElementById('mintMsg'),
+    mintOut: document.getElementById('mintOut'),
+    filterSite: document.getElementById('filterSite'),
+    filterUnused: document.getElementById('filterUnused'),
+    refreshTickets: document.getElementById('refreshTickets'),
+    ticketBody: document.getElementById('ticketBody'),
+    gomlAdminLink: document.getElementById('gomlAdminLink'),
+  };
+
+  // Prefer GOML admin route on same host
+  try {
+    if (location.hostname.includes('goml')) {
+      els.gomlAdminLink.href = '/admin';
+    } else {
+      els.gomlAdminLink.href = 'https://goml.xtremerippleprotocol.online/admin';
+    }
+  } catch { /* ignore */ }
+
+  async function api(path, opts = {}) {
+    const res = await fetch(apiBase() + path, {
+      ...opts,
+      headers: { ...authHeaders(), ...(opts.headers || {}) },
+      credentials: 'same-origin',
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || res.statusText || 'Request failed');
+    return data;
+  }
+
+  function showMsg(el, text, ok) {
+    el.textContent = text || '';
+    el.className = 'msg ' + (ok ? 'ok' : 'err');
+  }
+
+  async function boot() {
+    if (!hasCreds()) {
+      els.gate.classList.remove('hidden');
+      els.gateMsg.textContent = 'No GOML admin session found in this browser.';
+      return;
+    }
+    try {
+      const st = await api('/api/admin/status');
+      els.app.classList.remove('hidden');
+      const addr =
+        sessionStorage.getItem(WALLET_ADDR_KEY) ||
+        st.wallet ||
+        'token login';
+      els.who.textContent = addr;
+      els.rolePill.textContent = st.role || 'admin-token';
+      els.prizeList.value = (st.prizes || []).join('\n');
+      await refreshTickets();
+    } catch (err) {
+      els.gate.classList.remove('hidden');
+      els.gateMsg.textContent = err.message || 'Admin auth failed';
+    }
+  }
+
+  async function savePrizes() {
+    const items = els.prizeList.value
+      .split('\n')
+      .map((s) => s.trim())
+      .filter(Boolean);
+    try {
+      const data = await api('/api/prizes', {
+        method: 'PUT',
+        body: JSON.stringify({ items }),
+      });
+      els.prizeList.value = data.prizes.join('\n');
+      showMsg(els.prizeMsg, 'Saved ' + data.prizes.length + ' prizes', true);
+    } catch (err) {
+      showMsg(els.prizeMsg, err.message, false);
+    }
+  }
+
+  async function mint() {
+    const body = {
+      site: els.site.value,
+      count: Number(els.count.value) || 1,
+      orderId: els.orderId.value.trim() || undefined,
+      walletAddress: els.walletBind.value.trim() || undefined,
+    };
+    try {
+      const data = await api('/api/tickets', {
+        method: 'POST',
+        body: JSON.stringify(body),
+      });
+      const codes = data.tickets.map((t) => t.code).join('\n');
+      els.mintOut.textContent = codes;
+      showMsg(els.mintMsg, 'Minted ' + data.tickets.length + ' ticket(s)', true);
+      await refreshTickets();
+    } catch (err) {
+      showMsg(els.mintMsg, err.message, false);
+    }
+  }
+
+  async function refreshTickets() {
+    const q = new URLSearchParams();
+    if (els.filterSite.value) q.set('site', els.filterSite.value);
+    if (els.filterUnused.value) q.set('unused', els.filterUnused.value);
+    try {
+      const data = await api('/api/tickets?' + q.toString());
+      els.ticketBody.innerHTML = (data.tickets || [])
+        .slice(0, 100)
+        .map((t) => {
+          const used = t.usedAt
+            ? new Date(t.usedAt).toLocaleString()
+            : '—';
+          const prize = t.prizeResult?.label || '—';
+          return (
+            '<tr>' +
+            '<td><code>' +
+            escapeHtml(t.code) +
+            '</code></td>' +
+            '<td>' +
+            escapeHtml(t.site) +
+            '</td>' +
+            '<td><code>' +
+            escapeHtml(t.walletAddress || '—') +
+            '</code></td>' +
+            '<td>' +
+            escapeHtml(t.orderId || '—') +
+            '</td>' +
+            '<td>' +
+            escapeHtml(used) +
+            '</td>' +
+            '<td>' +
+            escapeHtml(prize) +
+            '</td>' +
+            '</tr>'
+          );
+        })
+        .join('');
+    } catch (err) {
+      els.ticketBody.innerHTML =
+        '<tr><td colspan="6">' + escapeHtml(err.message) + '</td></tr>';
+    }
+  }
+
+  function escapeHtml(s) {
+    return String(s)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;');
+  }
+
+  els.savePrizes.addEventListener('click', savePrizes);
+  els.mintBtn.addEventListener('click', mint);
+  els.refreshTickets.addEventListener('click', refreshTickets);
+  els.filterSite.addEventListener('change', refreshTickets);
+  els.filterUnused.addEventListener('change', refreshTickets);
+
+  boot();
+})();

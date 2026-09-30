@@ -1,15 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <!-- wheel path normalize: /wheel?site=... must become /wheel/?site=... or relative assets 404 into GOML SPA -->
-  <script>
-    (function () {
-      var p = location.pathname;
-      if (p === "/wheel" || /\/wheel$/.test(p)) {
-        location.replace(p + "/" + location.search + location.hash);
-      }
-    })();
-  </script>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
   <title>Prize Wheel</title>
@@ -44,12 +35,6 @@
         </div>
         <p class="site-gate-error" id="siteGateError" hidden></p>
       </div>
-    </div>
-
-    <div class="watch-banner" id="watchBanner" hidden>
-      <span class="watch-dot" aria-hidden="true"></span>
-      <span>LIVE GIVEAWAY</span>
-      <span class="watch-sub">Watch only · admin spins from GOML Admin</span>
     </div>
 
     <header class="chrome" id="chrome">

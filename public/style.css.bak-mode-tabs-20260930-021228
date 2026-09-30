@@ -1241,10 +1241,12 @@ body.embed .wheel-wrap {
   background: #fff;
   padding: 6px;
 }
-/* Site-locked (shop/goml): hide editable item list so odds cannot be
-   client-tampered, but keep Names/Prizes mode tabs visible for display/demo.
-   Fair spins still force server prize list in /api/spin. */
-body.site-locked .controls .input-panel {
+body.site-locked .controls .input-panel,
+body.site-locked .mode-tabs {
+  display: none !important;
+}
+body.site-shop .mode-tabs,
+body.site-goml .mode-tabs {
   display: none !important;
 }
 body.spin-locked #spinBtn {
@@ -1262,51 +1264,3 @@ body.spin-locked #spinBtn {
   font-size: 0.78rem;
   letter-spacing: 0.04em;
 }
-
-
-/* ── Public watch / live embed ───────────────────────────────────────────── */
-.watch-banner {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 0.55rem;
-  flex-wrap: wrap;
-  margin: 0 auto 0.75rem;
-  padding: 0.45rem 0.9rem;
-  max-width: 520px;
-  border-radius: 999px;
-  border: 1px solid rgba(212, 175, 55, 0.45);
-  background: linear-gradient(180deg, rgba(40, 18, 18, 0.92), rgba(12, 10, 8, 0.95));
-  color: #f0d78c;
-  font-family: Cinzel, Georgia, serif;
-  font-weight: 700;
-  font-size: 0.78rem;
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
-}
-.watch-banner .watch-sub {
-  font-family: Inter, system-ui, sans-serif;
-  font-weight: 500;
-  font-size: 0.68rem;
-  letter-spacing: 0.04em;
-  color: rgba(245, 240, 230, 0.65);
-  text-transform: none;
-}
-.watch-banner .watch-dot {
-  width: 0.55rem;
-  height: 0.55rem;
-  border-radius: 50%;
-  background: #e11d48;
-  box-shadow: 0 0 0 0 rgba(225, 29, 72, 0.7);
-  animation: watch-pulse 1.4s ease-out infinite;
-}
-@keyframes watch-pulse {
-  0% { box-shadow: 0 0 0 0 rgba(225, 29, 72, 0.55); }
-  70% { box-shadow: 0 0 0 8px rgba(225, 29, 72, 0); }
-  100% { box-shadow: 0 0 0 0 rgba(225, 29, 72, 0); }
-}
-body.watch-mode .watch-banner[hidden] { display: none; }
-body.watch-mode #controls,
-body.watch-mode #modeTabs { display: none !important; }
-body.watch-mode .chrome { display: none; }
-body.watch-mode.embed .app { padding-top: 8px; }
