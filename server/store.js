@@ -10,7 +10,7 @@ const STORE_PATH = path.join(DATA_DIR, 'store.json');
 
 const DEFAULT_PRIZES = ['10% Off', 'Free Shipping', 'Mystery Gift', 'Try Again'];
 
-/** @type {{ tickets: object[], prizes: string[], payoutCodes: object[], updatedAt: number } | null} */
+/** @type {{ tickets: object[], prizes: string[], payoutCodes: object[], inventory: object[], distributions: object[], wallets: object[], updatedAt: number } | null} */
 let cache = null;
 
 function ensureDir() {
@@ -24,6 +24,9 @@ function defaultStore() {
     tickets: [],
     prizes: DEFAULT_PRIZES.slice(),
     payoutCodes: [],
+    inventory: [],
+    distributions: [],
+    wallets: [],
     updatedAt: Date.now(),
   };
 }
@@ -46,6 +49,9 @@ function load() {
           ? parsed.prizes.map(String)
           : DEFAULT_PRIZES.slice(),
       payoutCodes: Array.isArray(parsed.payoutCodes) ? parsed.payoutCodes : [],
+      inventory: Array.isArray(parsed.inventory) ? parsed.inventory : [],
+      distributions: Array.isArray(parsed.distributions) ? parsed.distributions : [],
+      wallets: Array.isArray(parsed.wallets) ? parsed.wallets : [],
       updatedAt: Number(parsed.updatedAt) || Date.now(),
     };
   } catch {
@@ -67,7 +73,7 @@ function persist(store) {
 /**
  * Mutate store synchronously (atomic within single Node process).
  * @template T
- * @param {(store: { tickets: object[], prizes: string[], payoutCodes: object[], updatedAt: number }) => T} fn
+ * @param {(store: { tickets: object[], prizes: string[], payoutCodes: object[], inventory: object[], distributions: object[], wallets: object[], updatedAt: number }) => T} fn
  * @returns {T}
  */
 function update(fn) {
@@ -111,6 +117,42 @@ function cleanExpiredCodes() {
   });
 }
 
+function addInventoryItem(item) {
+  return update((store) => {
+    store.inventory.push(item);
+    return item;
+  });
+}
+
+function getInventory(filter = {}) {
+  const items = load().inventory;
+  if (!filter.available) return items;
+  return items.filter(item => !item.distributed);
+}
+
+function markDistributed(itemId, distributionId) {
+  return update((store) => {
+    const item = store.inventory.find(i => i.id === itemId);
+    if (item) {
+      item.distributed = true;
+      item.distributedAt = Date.now();
+      item.distributionId = distributionId;
+    }
+    return item;
+  });
+}
+
+function addDistribution(dist) {
+  return update((store) => {
+    store.distributions.push(dist);
+    return dist;
+  });
+}
+
+function getDistributions() {
+  return load().distributions.slice();
+}
+
 module.exports = {
   DATA_DIR,
   STORE_PATH,
@@ -122,4 +164,9 @@ module.exports = {
   addPayoutCode,
   getPayoutCodes,
   cleanExpiredCodes,
+  addInventoryItem,
+  getInventory,
+  markDistributed,
+  addDistribution,
+  getDistributions,
 };

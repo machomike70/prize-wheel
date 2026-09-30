@@ -297,6 +297,175 @@
       color: rgb(252, 165, 165);
       border-color: rgb(239, 68, 68);
     }
+    
+    .backup-modal {
+      display: none;
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0, 0, 0, 0.9);
+      z-index: 1000;
+      overflow-y: auto;
+      padding: 2rem;
+    }
+    
+    .backup-modal.active {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    
+    .backup-content {
+      max-width: 600px;
+      background: var(--felt-dark);
+      border: 3px solid rgb(239, 68, 68);
+      border-radius: 12px;
+      padding: 2rem;
+      position: relative;
+    }
+    
+    .backup-title {
+      font-family: 'Cinzel', serif;
+      font-size: 1.75rem;
+      color: rgb(239, 68, 68);
+      margin: 0 0 1rem;
+      text-align: center;
+    }
+    
+    .backup-step {
+      display: none;
+    }
+    
+    .backup-step.active {
+      display: block;
+    }
+    
+    .seed-display {
+      background: rgba(0, 0, 0, 0.5);
+      border: 2px solid var(--gold);
+      border-radius: 8px;
+      padding: 1.5rem;
+      margin: 1.5rem 0;
+      text-align: center;
+    }
+    
+    .seed-text {
+      font-family: 'Courier New', monospace;
+      font-size: 1.25rem;
+      color: var(--gold-bright);
+      letter-spacing: 0.05em;
+      word-break: break-all;
+      user-select: all;
+    }
+    
+    .verification-input {
+      width: 100%;
+      padding: 1rem;
+      font-family: 'Courier New', monospace;
+      font-size: 1rem;
+      text-align: center;
+      border: 2px solid var(--gold);
+      border-radius: 8px;
+      background: rgba(0, 0, 0, 0.3);
+      color: var(--cream);
+      margin: 1rem 0;
+    }
+    
+    .verification-word-item {
+      margin-bottom: 1.5rem;
+    }
+    
+    .verification-word-label {
+      display: block;
+      color: var(--gold);
+      font-weight: 600;
+      margin-bottom: 0.5rem;
+      font-size: 0.875rem;
+    }
+    
+    .verification-word-input {
+      width: 100%;
+      padding: 0.75rem;
+      font-family: 'Courier New', monospace;
+      font-size: 1.125rem;
+      border: 2px solid var(--gold);
+      border-radius: 8px;
+      background: rgba(0, 0, 0, 0.3);
+      color: var(--cream);
+    }
+    
+    .verification-word-input:focus {
+      outline: none;
+      border-color: var(--gold-bright);
+      box-shadow: 0 0 0 3px rgba(212, 175, 55, 0.2);
+    }
+    
+    .verification-word-input.error {
+      border-color: rgb(239, 68, 68);
+      box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.2);
+    }
+    
+    .backup-warning-box {
+      background: rgba(239, 68, 68, 0.2);
+      border: 2px solid rgb(239, 68, 68);
+      border-radius: 8px;
+      padding: 1rem;
+      margin: 1rem 0;
+    }
+    
+    .backup-warning-box p {
+      margin: 0.5rem 0;
+      color: rgb(252, 165, 165);
+      font-size: 0.875rem;
+    }
+    
+    .backup-btn-group {
+      display: flex;
+      gap: 0.75rem;
+      margin-top: 1.5rem;
+    }
+    
+    .backup-btn {
+      flex: 1;
+      padding: 1rem;
+      font-size: 1rem;
+      font-weight: 700;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    
+    .backup-btn.primary {
+      background: linear-gradient(135deg, var(--gold) 0%, var(--gold-bright) 100%);
+      color: var(--dark-ink);
+    }
+    
+    .backup-btn.danger {
+      background: rgba(239, 68, 68, 0.3);
+      color: rgb(252, 165, 165);
+      border: 2px solid rgb(239, 68, 68);
+    }
+    
+    .backup-checkbox {
+      margin: 1rem 0;
+    }
+    
+    .backup-checkbox label {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      cursor: pointer;
+      color: var(--cream);
+    }
+    
+    .backup-checkbox input[type="checkbox"] {
+      width: 20px;
+      height: 20px;
+      cursor: pointer;
+    }
   </style>
 </head>
 <body>
@@ -317,11 +486,12 @@
 
         <div class="warning-banner">
           <p><strong>⚠️ CRITICAL SECURITY NOTICE:</strong></p>
-          <p>• Private keys are generated CLIENT-SIDE only</p>
-          <p>• Keys are stored ONLY in your browser's localStorage</p>
-          <p>• Download and backup your seed phrase immediately</p>
-          <p>• Loss of seed = permanent loss of wallet access</p>
-          <p>• Server stores ONLY public address + project label</p>
+          <p>• Private keys are generated CLIENT-SIDE only (in your browser)</p>
+          <p>• GOML NEVER receives, stores, or can recover your seed</p>
+          <p>• Keys stored ONLY in your browser's localStorage</p>
+          <p>• <strong>YOU MUST BACKUP YOUR SEED BEFORE USE</strong></p>
+          <p>• Loss of seed = PERMANENT LOSS of wallet access</p>
+          <p>• GOML stores ONLY public address + label (after backup confirmation)</p>
         </div>
 
         <div class="info-banner">
@@ -369,6 +539,101 @@
     </div>
   </div>
 
+  <!-- Backup Confirmation Modal -->
+  <div id="backupModal" class="backup-modal">
+    <div class="backup-content">
+      <!-- Step 1: Show seed -->
+      <div id="backupStep1" class="backup-step active">
+        <h2 class="backup-title">⚠️ BACKUP YOUR SEED</h2>
+        
+        <div class="backup-warning-box">
+          <p><strong>CRITICAL:</strong> This is the ONLY time you'll see your seed phrase.</p>
+          <p>• Write it down on paper or save to a password manager</p>
+          <p>• NEVER share it with anyone, including GOML staff</p>
+          <p>• If lost, your funds are PERMANENTLY UNRECOVERABLE</p>
+          <p>• GOML cannot and will not recover lost seeds</p>
+        </div>
+
+        <div class="seed-display">
+          <div class="wallet-label">🔑 YOUR SEED PHRASE</div>
+          <div class="seed-text" id="backupSeedDisplay"></div>
+        </div>
+
+        <div class="backup-checkbox">
+          <label>
+            <input type="checkbox" id="backupWritten">
+            <span>I have written down my seed phrase in a secure location</span>
+          </label>
+        </div>
+
+        <div class="backup-btn-group">
+          <button type="button" class="backup-btn danger" onclick="cancelBackup()">
+            Cancel (Lose Wallet)
+          </button>
+          <button type="button" class="backup-btn primary" id="backupContinue" disabled>
+            Continue to Verification
+          </button>
+        </div>
+      </div>
+
+      <!-- Step 2: Verify seed -->
+      <div id="backupStep2" class="backup-step">
+        <h2 class="backup-title">✅ VERIFY YOUR BACKUP</h2>
+        
+        <p style="text-align: center; color: var(--cream); margin-bottom: 1.5rem;">
+          To confirm you've saved your seed correctly, please enter the requested words:
+        </p>
+
+        <div id="verificationWords"></div>
+
+        <div class="backup-checkbox" style="margin-top: 1.5rem;">
+          <label>
+            <input type="checkbox" id="backupSavedCheckbox">
+            <span><strong>I confirm I have securely saved my complete seed phrase</strong></span>
+          </label>
+        </div>
+
+        <div class="backup-warning-box">
+          <p><strong>Why verify?</strong></p>
+          <p>• Random word verification proves you saved the seed correctly</p>
+          <p>• Without both verification AND confirmation, wallet stays unusable</p>
+          <p>• GOML cannot and will not recover lost seeds</p>
+        </div>
+
+        <div class="backup-btn-group">
+          <button type="button" class="backup-btn danger" onclick="backupStepBack()">
+            ← Back to Seed
+          </button>
+          <button type="button" class="backup-btn primary" onclick="verifyBackup()">
+            Verify & Complete
+          </button>
+        </div>
+      </div>
+
+      <!-- Step 3: Success -->
+      <div id="backupStep3" class="backup-step">
+        <h2 class="backup-title" style="color: var(--gold);">✅ BACKUP CONFIRMED</h2>
+        
+        <p style="text-align: center; color: var(--cream); font-size: 1.125rem; margin: 2rem 0;">
+          Your wallet is now ready to use!
+        </p>
+
+        <div class="info-banner">
+          <p><strong>✓ Seed verified and saved securely</strong></p>
+          <p>• Your wallet address has been registered</p>
+          <p>• You can now receive deposits</p>
+          <p>• Keep your seed phrase safe - you'll need it to sign transactions</p>
+        </div>
+
+        <div class="backup-btn-group">
+          <button type="button" class="backup-btn primary" onclick="closeBackupModal()">
+            Done
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <script src="https://unpkg.com/xrpl@4.2.1/build/xrpl-latest-min.js"></script>
   <script>
     (() => {
@@ -377,6 +642,9 @@
       const STORAGE_KEY = 'prize-wheel:wallets:v1';
       let selectedNetwork = 'testnet';
       let currentWallet = null;
+      let pendingWallet = null; // Wallet awaiting backup confirmation
+      let verificationPositions = []; // Random word positions to verify
+      let seedWords = []; // Split seed into words
 
       const els = {
         networkBtns: document.querySelectorAll('.network-btn'),
@@ -407,7 +675,7 @@
         try {
           // Generate wallet client-side using xrpl.js
           const wallet = xrpl.Wallet.generate();
-          currentWallet = {
+          pendingWallet = {
             label,
             network: selectedNetwork,
             address: wallet.address,
@@ -415,12 +683,12 @@
             publicKey: wallet.publicKey,
             privateKey: wallet.privateKey,
             createdAt: Date.now(),
+            backupConfirmed: false,
           };
 
-          displayWallet(currentWallet);
-          saveWallet(currentWallet);
-          loadStoredWallets();
-          els.walletLabel.value = '';
+          // Show backup confirmation modal
+          showBackupModal(pendingWallet);
+          
         } catch (err) {
           alert('Failed to generate wallet: ' + err.message);
         }
@@ -634,6 +902,161 @@
           .replace(/</g, '&lt;')
           .replace(/>/g, '&gt;')
           .replace(/"/g, '&quot;');
+      }
+
+      // Backup confirmation modal
+      function showBackupModal(wallet) {
+        document.getElementById('backupSeedDisplay').textContent = wallet.seed;
+        document.getElementById('backupModal').classList.add('active');
+        document.getElementById('backupStep1').classList.add('active');
+        document.getElementById('backupStep2').classList.remove('active');
+        document.getElementById('backupStep3').classList.remove('active');
+      }
+
+      window.cancelBackup = function() {
+        if (!confirm('Are you sure? The wallet will be lost and cannot be recovered.')) {
+          return;
+        }
+        pendingWallet = null;
+        document.getElementById('backupModal').classList.remove('active');
+      };
+
+      // Enable continue button when checkbox checked
+      document.getElementById('backupWritten').addEventListener('change', (e) => {
+        document.getElementById('backupContinue').disabled = !e.target.checked;
+      });
+
+      document.getElementById('backupContinue').addEventListener('click', () => {
+        document.getElementById('backupStep1').classList.remove('active');
+        document.getElementById('backupStep2').classList.add('active');
+        
+        // Generate random word verification challenge
+        setupWordVerification(pendingWallet.seed);
+      });
+
+      window.backupStepBack = function() {
+        document.getElementById('backupStep2').classList.remove('active');
+        document.getElementById('backupStep1').classList.add('active');
+        // Clear verification inputs
+        document.getElementById('verificationWords').innerHTML = '';
+        document.getElementById('backupSavedCheckbox').checked = false;
+      };
+
+      function setupWordVerification(seed) {
+        // Split seed into words
+        seedWords = seed.split(' ');
+        
+        // Generate 3 random positions to verify
+        const numWords = seedWords.length;
+        const positions = [];
+        while (positions.length < 3) {
+          const pos = Math.floor(Math.random() * numWords);
+          if (!positions.includes(pos)) {
+            positions.push(pos);
+          }
+        }
+        positions.sort((a, b) => a - b);
+        verificationPositions = positions;
+
+        // Create input fields for each position
+        const container = document.getElementById('verificationWords');
+        container.innerHTML = positions.map((pos, idx) => `
+          <div class="verification-word-item">
+            <label class="verification-word-label">
+              Word #${pos + 1} from your seed phrase:
+            </label>
+            <input 
+              type="text" 
+              class="verification-word-input"
+              id="wordInput${idx}"
+              placeholder="Enter word ${pos + 1}"
+              autocomplete="off"
+            />
+          </div>
+        `).join('');
+
+        // Focus first input
+        setTimeout(() => {
+          document.getElementById('wordInput0').focus();
+        }, 100);
+      }
+
+      window.verifyBackup = function() {
+        // Check 1: Verify random words (AND logic)
+        let wordsValid = true;
+        const errors = [];
+        
+        verificationPositions.forEach((pos, idx) => {
+          const input = document.getElementById(`wordInput${idx}`);
+          const entered = input.value.trim().toLowerCase();
+          const expected = seedWords[pos].toLowerCase();
+          
+          if (entered !== expected) {
+            wordsValid = false;
+            input.classList.add('error');
+            errors.push(`Word #${pos + 1} is incorrect`);
+          } else {
+            input.classList.remove('error');
+          }
+        });
+
+        // Check 2: Confirm checkbox (AND logic)
+        const checkboxConfirmed = document.getElementById('backupSavedCheckbox').checked;
+
+        // BOTH must pass (AND logic)
+        if (!wordsValid || !checkboxConfirmed) {
+          let errorMsg = '';
+          if (!wordsValid) {
+            errorMsg += 'Word verification failed:\n' + errors.join('\n') + '\n\n';
+          }
+          if (!checkboxConfirmed) {
+            errorMsg += 'You must confirm you have saved your seed phrase.\n';
+          }
+          errorMsg += '\nWallet cannot be used until BOTH requirements are met.';
+          alert(errorMsg);
+          return;
+        }
+
+        // Both checks passed - mark as backup confirmed
+        pendingWallet.backupConfirmed = true;
+        currentWallet = pendingWallet;
+
+        // Save to localStorage
+        saveWallet(currentWallet);
+        
+        // Register with server (only public address + label)
+        registerWalletWithServer(currentWallet);
+
+        // Show success step
+        document.getElementById('backupStep2').classList.remove('active');
+        document.getElementById('backupStep3').classList.add('active');
+      };
+
+      window.closeBackupModal = function() {
+        document.getElementById('backupModal').classList.remove('active');
+        displayWallet(currentWallet);
+        loadStoredWallets();
+        els.walletLabel.value = '';
+        pendingWallet = null;
+      };
+
+      async function registerWalletWithServer(wallet) {
+        try {
+          await fetch('/api/wallets/register', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              address: wallet.address,
+              label: wallet.label,
+              network: wallet.network,
+              publicKey: wallet.publicKey,
+              // NEVER send seed or private key
+            }),
+          });
+          console.log('[Wallet] Registered with server (public info only)');
+        } catch (err) {
+          console.warn('[Wallet] Server registration failed (non-critical):', err.message);
+        }
       }
 
       // Load stored wallets on page load
