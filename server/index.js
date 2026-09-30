@@ -17,6 +17,7 @@ const {
   addPayoutCode,
   getPayoutCodes,
   cleanExpiredCodes,
+  update,
 } = require('./store');
 const {
   createPayoutCode,
@@ -138,12 +139,22 @@ app.post('/api/claim', claimLimiter, (req, res) => {
     return res.status(400).json({ error: 'Missing or invalid code' });
   }
   
-  const payoutCodes = getPayoutCodes();
-  const result = validateAndBurn({ inputCode: code, payoutCodes });
+  const result = validateAndBurn({
+    inputCode: code,
+    payoutCodes: getPayoutCodes()
+  });
   
   if (!result.valid) {
     return res.status(400).json({ error: result.error });
   }
+  
+  // Persist the burned status to disk
+  update((store) => {
+    const codeIndex = store.payoutCodes.findIndex(c => c.codeHash === result.record.codeHash);
+    if (codeIndex !== -1) {
+      store.payoutCodes[codeIndex] = result.record;
+    }
+  });
   
   // Code is valid and burned - trigger NFT release
   // TODO: integrate with hot wallet / XRPL NFT send

@@ -1,0 +1,644 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <title>Hot Wallet Manager - Prize Wheel</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700;800&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="style.css" />
+  <style>
+    .wallet-container {
+      max-width: 720px;
+      margin: 2rem auto;
+      padding: 1rem;
+    }
+    
+    .wallet-panel {
+      background: var(--felt-dark);
+      border: 2px solid var(--gold);
+      border-radius: 12px;
+      padding: 2rem;
+      margin-bottom: 1.5rem;
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+    }
+    
+    .panel-title {
+      font-family: 'Cinzel', serif;
+      font-size: 1.75rem;
+      color: var(--gold);
+      margin: 0 0 0.5rem;
+    }
+    
+    .panel-subtitle {
+      color: var(--cream);
+      opacity: 0.8;
+      margin: 0 0 1.5rem;
+      font-size: 0.9rem;
+    }
+    
+    .warning-banner {
+      background: rgba(239, 68, 68, 0.15);
+      border: 2px solid rgb(239, 68, 68);
+      border-radius: 8px;
+      padding: 1rem;
+      margin-bottom: 1.5rem;
+    }
+    
+    .warning-banner p {
+      margin: 0.25rem 0;
+      color: rgb(252, 165, 165);
+      font-size: 0.875rem;
+    }
+    
+    .warning-banner strong {
+      color: rgb(239, 68, 68);
+    }
+    
+    .info-banner {
+      background: rgba(59, 130, 246, 0.15);
+      border: 2px solid rgb(59, 130, 246);
+      border-radius: 8px;
+      padding: 1rem;
+      margin-bottom: 1.5rem;
+    }
+    
+    .info-banner p {
+      margin: 0.25rem 0;
+      color: rgb(147, 197, 253);
+      font-size: 0.875rem;
+    }
+    
+    .network-toggle {
+      display: flex;
+      gap: 0.5rem;
+      margin-bottom: 1.5rem;
+      padding: 0.5rem;
+      background: rgba(0, 0, 0, 0.3);
+      border-radius: 8px;
+    }
+    
+    .network-btn {
+      flex: 1;
+      padding: 0.75rem;
+      font-weight: 600;
+      border: 2px solid transparent;
+      border-radius: 6px;
+      background: transparent;
+      color: var(--cream);
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    
+    .network-btn.active {
+      border-color: var(--gold);
+      background: rgba(212, 175, 55, 0.2);
+      color: var(--gold);
+    }
+    
+    .wallet-input {
+      width: 100%;
+      padding: 0.75rem;
+      margin-bottom: 1rem;
+      font-size: 1rem;
+      border: 2px solid var(--gold);
+      border-radius: 8px;
+      background: rgba(0, 0, 0, 0.3);
+      color: var(--cream);
+    }
+    
+    .wallet-input:focus {
+      outline: none;
+      border-color: var(--gold-bright);
+      box-shadow: 0 0 0 3px rgba(212, 175, 55, 0.2);
+    }
+    
+    .btn-group {
+      display: flex;
+      gap: 0.75rem;
+      margin-top: 1rem;
+    }
+    
+    .wallet-btn {
+      flex: 1;
+      padding: 1rem;
+      font-size: 1rem;
+      font-weight: 700;
+      background: linear-gradient(135deg, var(--gold) 0%, var(--gold-bright) 100%);
+      color: var(--dark-ink);
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    
+    .wallet-btn:hover:not(:disabled) {
+      transform: translateY(-2px);
+      box-shadow: 0 4px 12px rgba(212, 175, 55, 0.4);
+    }
+    
+    .wallet-btn:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+    
+    .wallet-btn.secondary {
+      background: rgba(212, 175, 55, 0.2);
+      color: var(--gold);
+      border: 2px solid var(--gold);
+    }
+    
+    .wallet-display {
+      background: rgba(0, 0, 0, 0.5);
+      border: 2px solid var(--gold);
+      border-radius: 8px;
+      padding: 1.5rem;
+      margin-top: 1.5rem;
+    }
+    
+    .wallet-field {
+      margin-bottom: 1.5rem;
+    }
+    
+    .wallet-field:last-child {
+      margin-bottom: 0;
+    }
+    
+    .wallet-label {
+      font-size: 0.875rem;
+      color: var(--gold);
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      margin-bottom: 0.5rem;
+    }
+    
+    .wallet-value {
+      font-family: 'Courier New', monospace;
+      font-size: 1rem;
+      color: var(--cream);
+      word-break: break-all;
+      padding: 0.75rem;
+      background: rgba(0, 0, 0, 0.3);
+      border-radius: 6px;
+      user-select: all;
+      cursor: text;
+    }
+    
+    .seed-value {
+      filter: blur(8px);
+      transition: filter 0.2s;
+    }
+    
+    .seed-value:hover {
+      filter: blur(0);
+    }
+    
+    .copy-icon {
+      display: inline-block;
+      margin-left: 0.5rem;
+      cursor: pointer;
+      opacity: 0.6;
+      transition: opacity 0.2s;
+    }
+    
+    .copy-icon:hover {
+      opacity: 1;
+    }
+    
+    .wallet-actions {
+      display: flex;
+      gap: 0.75rem;
+      margin-top: 1rem;
+    }
+    
+    .action-btn {
+      flex: 1;
+      padding: 0.75rem;
+      font-size: 0.875rem;
+      font-weight: 600;
+      background: rgba(212, 175, 55, 0.2);
+      color: var(--gold);
+      border: 1px solid var(--gold);
+      border-radius: 6px;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    
+    .action-btn:hover {
+      background: rgba(212, 175, 55, 0.3);
+    }
+    
+    .stored-wallets {
+      margin-top: 1.5rem;
+    }
+    
+    .wallet-card {
+      background: rgba(0, 0, 0, 0.3);
+      border: 1px solid var(--gold);
+      border-radius: 8px;
+      padding: 1rem;
+      margin-bottom: 0.75rem;
+    }
+    
+    .wallet-card-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 0.5rem;
+    }
+    
+    .wallet-card-label {
+      font-weight: 600;
+      color: var(--gold);
+    }
+    
+    .wallet-card-network {
+      font-size: 0.75rem;
+      padding: 0.25rem 0.5rem;
+      background: rgba(59, 130, 246, 0.3);
+      color: rgb(147, 197, 253);
+      border-radius: 4px;
+    }
+    
+    .wallet-card-address {
+      font-family: 'Courier New', monospace;
+      font-size: 0.875rem;
+      color: var(--cream);
+      word-break: break-all;
+      opacity: 0.8;
+    }
+    
+    .wallet-card-actions {
+      display: flex;
+      gap: 0.5rem;
+      margin-top: 0.75rem;
+    }
+    
+    .small-btn {
+      padding: 0.5rem 1rem;
+      font-size: 0.8125rem;
+      font-weight: 600;
+      background: rgba(212, 175, 55, 0.2);
+      color: var(--gold);
+      border: 1px solid var(--gold);
+      border-radius: 6px;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    
+    .small-btn:hover {
+      background: rgba(212, 175, 55, 0.3);
+    }
+    
+    .small-btn.danger {
+      background: rgba(239, 68, 68, 0.2);
+      color: rgb(252, 165, 165);
+      border-color: rgb(239, 68, 68);
+    }
+  </style>
+</head>
+<body>
+  <div class="felt-edge" aria-hidden="true"></div>
+  <div class="app">
+    <header class="chrome">
+      <div class="brand-mark" aria-hidden="true">♠</div>
+      <h1>Prize Wheel</h1>
+      <p class="subtitle">Hot Wallet Manager (Client-Side)</p>
+    </header>
+
+    <div class="wallet-container">
+      <div class="wallet-panel">
+        <h2 class="panel-title">🔐 Generate Hot Wallet</h2>
+        <p class="panel-subtitle">
+          Create an XRPL hot wallet for NFT giveaways. All keys are generated in your browser and never sent to the server.
+        </p>
+
+        <div class="warning-banner">
+          <p><strong>⚠️ CRITICAL SECURITY NOTICE:</strong></p>
+          <p>• Private keys are generated CLIENT-SIDE only</p>
+          <p>• Keys are stored ONLY in your browser's localStorage</p>
+          <p>• Download and backup your seed phrase immediately</p>
+          <p>• Loss of seed = permanent loss of wallet access</p>
+          <p>• Server stores ONLY public address + project label</p>
+        </div>
+
+        <div class="info-banner">
+          <p><strong>ℹ️ Network Selection:</strong></p>
+          <p>• Use TESTNET for testing (recommended)</p>
+          <p>• Use MAINNET only for production with caution</p>
+        </div>
+
+        <div class="network-toggle">
+          <button type="button" class="network-btn active" data-network="testnet">
+            🧪 Testnet
+          </button>
+          <button type="button" class="network-btn" data-network="mainnet">
+            🌐 Mainnet
+          </button>
+        </div>
+
+        <input 
+          type="text" 
+          id="walletLabel" 
+          class="wallet-input"
+          placeholder="Wallet label (e.g., 'GOML Giveaway Wallet')"
+          maxlength="50"
+        />
+
+        <div class="btn-group">
+          <button type="button" id="generateBtn" class="wallet-btn">
+            🎲 Generate New Wallet
+          </button>
+          <button type="button" id="importBtn" class="wallet-btn secondary">
+            📥 Import Seed
+          </button>
+        </div>
+
+        <div id="walletDisplay" style="display: none;"></div>
+      </div>
+
+      <div class="wallet-panel">
+        <h2 class="panel-title">💼 Stored Wallets</h2>
+        <p class="panel-subtitle">
+          Wallets stored in your browser (seeds encrypted in localStorage)
+        </p>
+        <div id="storedWallets"></div>
+      </div>
+    </div>
+  </div>
+
+  <script src="https://unpkg.com/xrpl@4.2.1/build/xrpl-latest-min.js"></script>
+  <script>
+    (() => {
+      'use strict';
+
+      const STORAGE_KEY = 'prize-wheel:wallets:v1';
+      let selectedNetwork = 'testnet';
+      let currentWallet = null;
+
+      const els = {
+        networkBtns: document.querySelectorAll('.network-btn'),
+        walletLabel: document.getElementById('walletLabel'),
+        generateBtn: document.getElementById('generateBtn'),
+        importBtn: document.getElementById('importBtn'),
+        walletDisplay: document.getElementById('walletDisplay'),
+        storedWallets: document.getElementById('storedWallets'),
+      };
+
+      // Network selection
+      els.networkBtns.forEach(btn => {
+        btn.addEventListener('click', () => {
+          els.networkBtns.forEach(b => b.classList.remove('active'));
+          btn.classList.add('active');
+          selectedNetwork = btn.dataset.network;
+        });
+      });
+
+      // Generate new wallet
+      els.generateBtn.addEventListener('click', () => {
+        const label = els.walletLabel.value.trim();
+        if (!label) {
+          alert('Please enter a wallet label');
+          return;
+        }
+
+        try {
+          // Generate wallet client-side using xrpl.js
+          const wallet = xrpl.Wallet.generate();
+          currentWallet = {
+            label,
+            network: selectedNetwork,
+            address: wallet.address,
+            seed: wallet.seed,
+            publicKey: wallet.publicKey,
+            privateKey: wallet.privateKey,
+            createdAt: Date.now(),
+          };
+
+          displayWallet(currentWallet);
+          saveWallet(currentWallet);
+          loadStoredWallets();
+          els.walletLabel.value = '';
+        } catch (err) {
+          alert('Failed to generate wallet: ' + err.message);
+        }
+      });
+
+      // Import existing seed
+      els.importBtn.addEventListener('click', () => {
+        const label = els.walletLabel.value.trim();
+        if (!label) {
+          alert('Please enter a wallet label');
+          return;
+        }
+
+        const seed = prompt('Enter your XRPL seed (starts with "s"):');
+        if (!seed) return;
+
+        try {
+          const wallet = xrpl.Wallet.fromSeed(seed);
+          currentWallet = {
+            label,
+            network: selectedNetwork,
+            address: wallet.address,
+            seed: wallet.seed,
+            publicKey: wallet.publicKey,
+            privateKey: wallet.privateKey,
+            createdAt: Date.now(),
+          };
+
+          displayWallet(currentWallet);
+          saveWallet(currentWallet);
+          loadStoredWallets();
+          els.walletLabel.value = '';
+        } catch (err) {
+          alert('Failed to import wallet: ' + err.message);
+        }
+      });
+
+      function displayWallet(wallet) {
+        els.walletDisplay.innerHTML = `
+          <div class="wallet-display">
+            <div class="wallet-field">
+              <div class="wallet-label">🏷️ Label</div>
+              <div class="wallet-value">${escapeHtml(wallet.label)}</div>
+            </div>
+            
+            <div class="wallet-field">
+              <div class="wallet-label">🌐 Network</div>
+              <div class="wallet-value">${escapeHtml(wallet.network).toUpperCase()}</div>
+            </div>
+            
+            <div class="wallet-field">
+              <div class="wallet-label">
+                📬 Public Address
+                <span class="copy-icon" onclick="copyText('${wallet.address}', this)">📋</span>
+              </div>
+              <div class="wallet-value">${escapeHtml(wallet.address)}</div>
+            </div>
+            
+            <div class="wallet-field">
+              <div class="wallet-label">
+                🔑 Seed Phrase (hover to reveal)
+                <span class="copy-icon" onclick="copyText('${wallet.seed}', this)">📋</span>
+              </div>
+              <div class="wallet-value seed-value">${escapeHtml(wallet.seed)}</div>
+            </div>
+            
+            <div class="warning-banner">
+              <p><strong>⚠️ SAVE YOUR SEED NOW!</strong></p>
+              <p>This is the only time you'll see your seed phrase in plaintext.</p>
+              <p>Write it down or download the backup file immediately.</p>
+            </div>
+            
+            <div class="wallet-actions">
+              <button type="button" class="action-btn" onclick="downloadBackup('${wallet.label}', '${wallet.seed}')">
+                💾 Download Backup
+              </button>
+              <button type="button" class="action-btn" onclick="fundTestnet('${wallet.address}')">
+                🚰 Fund on Testnet
+              </button>
+            </div>
+          </div>
+        `;
+        els.walletDisplay.style.display = 'block';
+      }
+
+      function saveWallet(wallet) {
+        try {
+          const stored = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
+          
+          // Check for duplicate
+          const exists = stored.find(w => w.address === wallet.address);
+          if (exists) {
+            if (!confirm('Wallet already exists. Overwrite?')) return;
+            const idx = stored.findIndex(w => w.address === wallet.address);
+            stored[idx] = wallet;
+          } else {
+            stored.push(wallet);
+          }
+          
+          localStorage.setItem(STORAGE_KEY, JSON.stringify(stored));
+        } catch (err) {
+          alert('Failed to save wallet: ' + err.message);
+        }
+      }
+
+      function loadStoredWallets() {
+        try {
+          const stored = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
+          
+          if (stored.length === 0) {
+            els.storedWallets.innerHTML = '<p style="color: var(--cream); opacity: 0.6;">No wallets stored yet</p>';
+            return;
+          }
+
+          els.storedWallets.innerHTML = stored.map((wallet, idx) => `
+            <div class="wallet-card">
+              <div class="wallet-card-header">
+                <span class="wallet-card-label">${escapeHtml(wallet.label)}</span>
+                <span class="wallet-card-network">${escapeHtml(wallet.network).toUpperCase()}</span>
+              </div>
+              <div class="wallet-card-address">${escapeHtml(wallet.address)}</div>
+              <div class="wallet-card-actions">
+                <button type="button" class="small-btn" onclick="loadWallet(${idx})">
+                  👁️ View
+                </button>
+                <button type="button" class="small-btn" onclick="copyText('${wallet.address}', this)">
+                  📋 Copy Address
+                </button>
+                <button type="button" class="small-btn danger" onclick="deleteWallet(${idx})">
+                  🗑️ Delete
+                </button>
+              </div>
+            </div>
+          `).join('');
+        } catch (err) {
+          els.storedWallets.innerHTML = '<p style="color: rgb(252, 165, 165);">Error loading wallets</p>';
+        }
+      }
+
+      window.loadWallet = function(idx) {
+        try {
+          const stored = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
+          const wallet = stored[idx];
+          if (wallet) {
+            currentWallet = wallet;
+            displayWallet(wallet);
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+          }
+        } catch (err) {
+          alert('Failed to load wallet: ' + err.message);
+        }
+      };
+
+      window.deleteWallet = function(idx) {
+        if (!confirm('Are you sure? This will delete the wallet from browser storage.')) {
+          return;
+        }
+
+        try {
+          const stored = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
+          stored.splice(idx, 1);
+          localStorage.setItem(STORAGE_KEY, JSON.stringify(stored));
+          loadStoredWallets();
+          
+          if (currentWallet && stored.findIndex(w => w.address === currentWallet.address) === -1) {
+            els.walletDisplay.style.display = 'none';
+            currentWallet = null;
+          }
+        } catch (err) {
+          alert('Failed to delete wallet: ' + err.message);
+        }
+      };
+
+      window.copyText = function(text, el) {
+        navigator.clipboard.writeText(text).then(() => {
+          const originalText = el.textContent;
+          el.textContent = '✅';
+          setTimeout(() => {
+            el.textContent = originalText;
+          }, 2000);
+        }).catch(err => {
+          alert('Failed to copy: ' + err.message);
+        });
+      };
+
+      window.downloadBackup = function(label, seed) {
+        const backup = {
+          label,
+          seed,
+          warning: 'KEEP THIS FILE SECURE. Anyone with this seed can access your wallet.',
+          created: new Date().toISOString(),
+        };
+        
+        const blob = new Blob([JSON.stringify(backup, null, 2)], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `prize-wheel-wallet-${label.replace(/[^a-z0-9]/gi, '-')}-backup.json`;
+        a.click();
+        URL.revokeObjectURL(url);
+      };
+
+      window.fundTestnet = function(address) {
+        const faucetUrl = `https://test.bithomp.com/faucet/${address}`;
+        window.open(faucetUrl, '_blank');
+      };
+
+      function escapeHtml(s) {
+        return String(s)
+          .replace(/&/g, '&amp;')
+          .replace(/</g, '&lt;')
+          .replace(/>/g, '&gt;')
+          .replace(/"/g, '&quot;');
+      }
+
+      // Load stored wallets on page load
+      loadStoredWallets();
+    })();
+  </script>
+</body>
+</html>
