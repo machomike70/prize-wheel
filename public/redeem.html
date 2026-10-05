@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Redeem — Prize Wheel Staging</title>
+  <link rel="stylesheet" href="style.css" />
+  <script src="admin-session.js"></script>
+  <style>
+    .redeem-wrap { max-width: 480px; margin: 2rem auto; padding: 1.5rem; }
+    .redeem-card {
+      background: var(--felt-dark, #1a2f1a);
+      border: 2px solid var(--gold, #d4af37);
+      border-radius: 12px;
+      padding: 1.75rem;
+    }
+    .redeem-card h1 {
+      font-family: Cinzel, serif;
+      color: var(--gold, #d4af37);
+      font-size: 1.6rem;
+      margin: 0 0 0.5rem;
+      text-align: center;
+    }
+    .redeem-card .sub {
+      text-align: center;
+      color: var(--cream, #f5f0e6);
+      opacity: 0.85;
+      margin: 0 0 1.5rem;
+      font-size: 0.95rem;
+    }
+    label { display: block; color: var(--gold, #d4af37); font-weight: 600; margin: 0.75rem 0 0.35rem; }
+    input {
+      width: 100%; box-sizing: border-box; padding: 0.85rem;
+      font-size: 1rem; border: 2px solid var(--gold, #d4af37); border-radius: 8px;
+      background: rgba(0,0,0,0.3); color: var(--cream, #f5f0e6);
+      font-family: ui-monospace, monospace;
+    }
+    button {
+      width: 100%; margin-top: 1.25rem; padding: 0.95rem; font-size: 1.05rem; font-weight: 700;
+      border: none; border-radius: 8px; cursor: pointer;
+      background: linear-gradient(135deg, #d4af37, #f0d060); color: #1a1208;
+    }
+    button:disabled { opacity: 0.5; cursor: not-allowed; }
+    .msg { margin-top: 1rem; padding: 0.85rem; border-radius: 8px; font-size: 0.95rem; word-break: break-word; }
+    .msg.ok { background: rgba(40,120,60,0.35); border: 1px solid #3d8; color: #cfc; }
+    .msg.err { background: rgba(120,40,40,0.35); border: 1px solid #d66; color: #fcc; }
+    .hint { font-size: 0.8rem; opacity: 0.65; margin-top: 0.35rem; color: var(--cream, #f5f0e6); }
+  </style>
+</head>
+<body>
+  <div class="redeem-wrap">
+    <div class="redeem-card">
+      <h1>Staging Redeem</h1>
+      <p class="sub">Testnet only. Enter your <code>STG-…</code> code and classic address.</p>
+      <form id="redeemForm">
+        <label for="code">Redeem code</label>
+        <input id="code" name="code" autocomplete="off" placeholder="STG-…" required />
+        <p class="hint">One-time code from the Telegram bot or admin.</p>
+        <label for="address">XRPL testnet address</label>
+        <input id="address" name="address" autocomplete="off" placeholder="r…" required />
+        <p class="hint">Classic address starting with r.</p>
+        <button type="submit" id="btn">Redeem (testnet payout)</button>
+      </form>
+      <div id="out" class="msg" hidden></div>
+    </div>
+  </div>
+  <script>
+  (function () {
+    function apiBase() {
+      if (window.PrizeWheelAdminSession && window.PrizeWheelAdminSession.apiBase) {
+        return window.PrizeWheelAdminSession.apiBase();
+      }
+      var path = location.pathname || '';
+      if (path.indexOf('/wheel-staging') === 0) return '/wheel-staging';
+      if (path.indexOf('/wheel') === 0) return '/wheel';
+      return '';
+    }
+    var form = document.getElementById('redeemForm');
+    var btn = document.getElementById('btn');
+    var out = document.getElementById('out');
+    form.addEventListener('submit', async function (e) {
+      e.preventDefault();
+      var code = document.getElementById('code').value.trim();
+      var address = document.getElementById('address').value.trim();
+      btn.disabled = true;
+      btn.textContent = 'Submitting…';
+      out.hidden = true;
+      try {
+        var res = await fetch(apiBase() + '/api/redeem', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+          body: JSON.stringify({ code: code, address: address }),
+        });
+        var data = await res.json().catch(function () { return {}; });
+        out.hidden = false;
+        if (res.ok && data.ok && data.sent) {
+          out.className = 'msg ok';
+          out.innerHTML = '✅ Sent on testnet<br>Amount: ' + (data.amountXrp || '?') +
+            ' XRP<br>Tx: <code>' + (data.txHash || '') + '</code>' +
+            (data.explorer ? '<br><a href="' + data.explorer + '" target="_blank" rel="noopener">Explorer</a>' : '');
+        } else if (res.ok && data.status === 'claimed_pending') {
+          out.className = 'msg ok';
+          out.textContent = data.message || 'Claim accepted; sends disabled.';
+        } else {
+          out.className = 'msg err';
+          out.textContent = data.error || data.message || ('HTTP ' + res.status);
+        }
+      } catch (err) {
+        out.hidden = false;
+        out.className = 'msg err';
+        out.textContent = 'Network error';
+      } finally {
+        btn.disabled = false;
+        btn.textContent = 'Redeem (testnet payout)';
+      }
+    });
+  })();
+  </script>
+</body>
+</html>
