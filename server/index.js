@@ -29,6 +29,22 @@ const {
   validateAndBurn,
   checkCodeStatus,
 } = require('./payout');
+const { parseSpaceId, scrapeSpace, formatParticipantsForGiveaway } = require('./spaces');
+const { findActiveHostedSpaces } = require('./spacesActive');
+const xAuth = require('./xAuth');
+const { scrapeXProfile, scrapeWebPage } = require('./scrape');
+const { ensureStagingLedgerPrize, isLedgerDeliverable } = require('./ledgerPrizes');
+const {
+  attachLedgerRedeem,
+  issueRedeemCode,
+  claimRedeemCode,
+  beginSend,
+  finishSend,
+  getRedeem,
+  listRedeems,
+} = require('./redeem');
+const stagingSender = require('./stagingSender');
+const { getHotWalletStatus } = require('./walletStatus');
 const hotWallet = require('./hotWallet');
 
 const app = express();
@@ -60,13 +76,28 @@ const spinLimiter = rateLimit({
   message: { error: 'Too many spins; try again shortly' },
 });
 
-app.post('/api/spin', spinLimiter, (req, res) => {
+const scrapeLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 10,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Too many scrape requests; try again shortly' },
+});
+
+// Staging: spin trigger is admin-only. Public viewers use GET verify / static UI.
+app.post('/api/spin', spinLimiter, requireAdmin, (req, res) => {
   const norm = normalizeRequest(req.body);
   if (!norm.ok) {
     return res.status(norm.status).json({ error: norm.error });
   }
   const out = createSpin(norm.mode, norm.items);
-  return res.json(out);
+  const ledger = attachLedgerRedeem(out.result);
+  return res.json({
+    ...out,
+    redeemCode: ledger.redeemCode,
+    ledgerDelivery: ledger.ledgerDelivery,
+    redeem: ledger.redeem,
+  });
 });
 
 function handleVerify(req, res) {
@@ -207,13 +238,137 @@ function stubNftRelease(codeRecord) {
     burnedAt: new Date(codeRecord.burnedAt).toISOString(),
   });
   
+  // Staging: no client-side wallet signature / Xaman step after claim.
   return {
-    status: 'pending',
-    message: 'NFT release queued for hot wallet processing',
+    status: 'queued_server',
+    message: 'NFT release queued server-side — no wallet signature required on staging',
     spinId: codeRecord.spinId,
     winner: codeRecord.winner,
   };
 }
+
+// ===== STAGING TESTNET SENDS (LEDGER REDEEM) =====
+
+const redeemLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 20,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Too many redeem attempts; try again shortly' },
+});
+
+function hotWalletPublicStatus() {
+  const status = getHotWalletStatus();
+  const send = stagingSender.publicStatus();
+  return {
+    configured: status.configured === true,
+    network: 'testnet',
+    sendsEnabled: send.sendsEnabled === true,
+    sendBlockedReason: send.sendBlockedReason,
+    payoutXrp: send.payoutXrp,
+  };
+}
+
+// Winner submits a one-time code plus their classic address.
+// STAGING: when stagingSender gates pass (testnet only), a real testnet Payment
+// is submitted from the staging hot wallet. Otherwise claims stay claimed_pending.
+app.post('/api/redeem', redeemLimiter, async (req, res) => {
+  const result = claimRedeemCode({
+    code: req.body?.code,
+    address: req.body?.address,
+  });
+  if (!result.ok) {
+    return res.status(result.status || 400).json({
+      ok: false,
+      error: result.error,
+      sent: false,
+    });
+  }
+  const code = String(req.body?.code || '').trim();
+  if (!stagingSender.sendsEnabled()) {
+    return res.json({
+      ok: true,
+      status: 'claimed_pending',
+      sent: false,
+      message: 'Claim accepted. Sends are disabled; nothing was sent.',
+      prize: result.record.prizeLabel,
+      winnerAddress: result.record.winnerAddress,
+      hotWallet: hotWalletPublicStatus(),
+    });
+  }
+  const started = beginSend(code);
+  if (!started) {
+    return res.status(409).json({ ok: false, error: 'Send already in progress or done', sent: false });
+  }
+  try {
+    const tx = await stagingSender.sendPrize({ destination: result.record.winnerAddress, code });
+    const ok = tx.result === 'tesSUCCESS' && tx.validated === true;
+    const rec = finishSend(code, ok ? { ok: true, tx } : { ok: false, tx, error: 'tx result ' + tx.result });
+    console.log('[redeem-send] code=%s result=%s validated=%s hash=%s', code.slice(0, 8) + '...', tx.result, tx.validated, tx.hash);
+    return res.status(ok ? 200 : 502).json({
+      ok,
+      status: rec.status,
+      sent: rec.sent === true,
+      prize: rec.prizeLabel,
+      winnerAddress: rec.winnerAddress,
+      txHash: tx.hash,
+      txResult: tx.result,
+      validated: tx.validated,
+      amountXrp: tx.amountXrp,
+      network: 'testnet',
+      explorer: 'https://testnet.xrpl.org/transactions/' + tx.hash,
+      hotWallet: hotWalletPublicStatus(),
+    });
+  } catch (err) {
+    const rec = finishSend(code, { ok: false, error: err.message });
+    console.error('[redeem-send] failed code=%s err=%s', code.slice(0, 8) + '...', err.message);
+    return res.status(502).json({
+      ok: false,
+      status: rec ? rec.status : 'send_failed',
+      sent: false,
+      error: 'Send failed; flagged for manual review (no automatic retry).',
+      hotWallet: hotWalletPublicStatus(),
+    });
+  }
+});
+
+// Public status for a redeem code (code holder only knows the code).
+app.get('/api/redeem/status', redeemLimiter, (req, res) => {
+  const rec = getRedeem(req.query?.code);
+  if (!rec) return res.status(404).json({ ok: false, error: 'Unknown code' });
+  return res.json({ ok: true, ...rec });
+});
+
+app.get('/api/admin/redeems', requireAdmin, (_req, res) => {
+  return res.json({ ok: true, redeems: listRedeems(), hotWallet: hotWalletPublicStatus() });
+});
+
+app.post('/api/admin/ledger-redeem', requireAdmin, (req, res) => {
+  const prizeLabel = String(req.body?.prizeLabel || '').trim();
+  if (!isLedgerDeliverable(prizeLabel)) {
+    return res.status(400).json({
+      ok: false,
+      error: 'Prize does not use on-ledger delivery',
+      redeemCode: null,
+      sent: false,
+    });
+  }
+  try {
+    const rec = issueRedeemCode({ prizeLabel, spinNonce: null });
+    return res.json({
+      ok: true,
+      redeemCode: rec.code,
+      status: rec.status,
+      prize: rec.prizeLabel,
+      sent: false,
+      notice: stagingSender.sendsEnabled()
+        ? 'Give this one-time code to the winner. Claim triggers a TESTNET payment.'
+        : 'Give this one-time code to the winner. Nothing was sent on-ledger.',
+    });
+  } catch (err) {
+    return res.status(err.status || 400).json({ ok: false, error: err.message, sent: false });
+  }
+});
 
 // ===== HOT WALLET ENDPOINTS (GOML SHARED WALLET) =====
 
@@ -430,12 +585,198 @@ app.post('/api/wallets/register', async (req, res) => {
   });
 });
 
+// Health endpoint
+app.get('/api/health', (_req, res) => {
+  return res.json({
+    ok: true,
+    service: 'prize-wheel-staging',
+    hotWallet: hotWalletPublicStatus(),
+    x: xAuth.publicStatus(),
+    bearerConfigured: xAuth.bearerConfigured(),
+    userOAuthConfigured: xAuth.userOAuthConfigured(),
+  });
+});
+
+// Config for admin Space UI (no secrets)
+app.get('/api/admin/spaces/config', requireAdmin, (_req, res) => {
+  const st = xAuth.getStatus();
+  return res.json({
+    ok: true,
+    spaceUrl: process.env.SPACE_URL || null,
+    bearerConfigured: st.bearerConfigured,
+    userOAuthConfigured: st.userOAuthConfigured,
+    authMode: st.authMode,
+    goml: { handle: st.goml.handle, userId: st.goml.userId },
+    note:
+      'Spaces lookups use the app Bearer (X Spaces endpoints reject OAuth 1.0a). ' +
+      'GOML user OAuth identifies the GOML account so "Use GOML Space" can find the live Space ' +
+      'GOML created / co-hosts / speaks in. Listener-only presence is not exposed by X — paste the URL.',
+  });
+});
+
+// Active spaces endpoint
+app.get('/api/admin/spaces/active', requireAdmin, async (req, res) => {
+  try {
+    const result = await findActiveHostedSpaces({ fresh: String(req.query.fresh || '') === '1' });
+    const status = !result.ok && result.error && result.error.includes('not configured') ? 503 : 200;
+    return res.status(status).json(result);
+  } catch (err) {
+    return res.status(500).json({
+      ok: false,
+      found: false,
+      space: null,
+      spaces: [],
+      chosen: null,
+      reason: err.message || 'Active space lookup failed',
+      error: err.message || 'Active space lookup failed',
+    });
+  }
+});
+
+// X Space scraping
+app.post('/api/admin/spaces/scrape', requireAdmin, scrapeLimiter, async (req, res) => {
+  const input = req.body?.spaceUrl || req.body?.spaceId;
+  if (!input) {
+    return res.status(400).json({ error: 'spaceUrl or spaceId required' });
+  }
+
+  const spaceId = parseSpaceId(input);
+  if (!spaceId) {
+    return res.status(400).json({ error: 'Invalid Space URL or ID' });
+  }
+
+  try {
+    const result = await scrapeSpace(spaceId);
+    if (!result.ok) {
+      return res.status(result.status || 502).json({
+        error: result.error,
+        hasListeners: result.hasListeners === true,
+        method: result.method || undefined,
+        warning: result.warning || undefined,
+      });
+    }
+
+    const names = formatParticipantsForGiveaway(result);
+    return res.json({
+      spaceId: result.spaceId,
+      spaceData: result.spaceData,
+      hosts: result.hosts,
+      speakers: result.speakers,
+      listeners: result.listeners,
+      names,
+      total: result.total,
+      hasListeners: result.hasListeners === true,
+      warning: result.warning || undefined,
+      method: result.method || undefined,
+      auth: xAuth.publicStatus(),
+    });
+  } catch (err) {
+    return res.status(500).json({ error: err.message || 'Scrape failed' });
+  }
+});
+
+// X auth status
+app.get('/api/admin/x/status', requireAdmin, scrapeLimiter, async (req, res) => {
+  const status = xAuth.getStatus();
+  if (String(req.query.verify || '') === '1') {
+    status.verify = await xAuth.verifyUser({ force: false });
+  }
+  return res.json({ ok: true, ...status });
+});
+
+// X profile scraping
+app.post('/api/admin/scrape/x-profile', requireAdmin, scrapeLimiter, async (req, res) => {
+  const username = req.body?.username || req.body?.handle || req.body?.url;
+  if (!username) {
+    return res.status(400).json({
+      error: 'username required (or handle / x.com profile url)',
+      publicRead: 'locked — admin X-Admin-Token required',
+    });
+  }
+  try {
+    const result = await scrapeXProfile(username);
+    if (!result.ok) {
+      return res.status(result.status || 502).json({
+        error: result.error,
+        publicRead: 'locked — admin X-Admin-Token required',
+      });
+    }
+    const { ok, ...payload } = result;
+    return res.json(payload);
+  } catch (err) {
+    return res.status(500).json({ error: err.message || 'X profile scrape failed' });
+  }
+});
+
+app.get('/api/admin/scrape/x-profile', requireAdmin, scrapeLimiter, async (req, res) => {
+  const username = req.query?.username || req.query?.handle || req.query?.url;
+  if (!username) {
+    return res.status(400).json({
+      error: 'username query required',
+      publicRead: 'locked — admin X-Admin-Token required',
+    });
+  }
+  try {
+    const result = await scrapeXProfile(username);
+    if (!result.ok) {
+      return res.status(result.status || 502).json({
+        error: result.error,
+        publicRead: 'locked — admin X-Admin-Token required',
+      });
+    }
+    const { ok, ...payload } = result;
+    return res.json(payload);
+  } catch (err) {
+    return res.status(500).json({ error: err.message || 'X profile scrape failed' });
+  }
+});
+
+// Web page scraping
+app.post('/api/admin/scrape/web', requireAdmin, scrapeLimiter, async (req, res) => {
+  const url = req.body?.url;
+  if (!url) {
+    return res.status(400).json({
+      error: 'url required (https preferred)',
+      publicRead: 'locked — admin X-Admin-Token required',
+      robotsTxt: 'not enforced in v1',
+    });
+  }
+  try {
+    const result = await scrapeWebPage(url);
+    if (!result.ok) {
+      return res.status(result.status || 502).json({
+        error: result.error,
+        publicRead: 'locked — admin X-Admin-Token required',
+        robotsTxt: 'not enforced in v1',
+      });
+    }
+    const { ok, ...payload } = result;
+    return res.json(payload);
+  } catch (err) {
+    return res.status(500).json({ error: err.message || 'Web scrape failed' });
+  }
+});
+
 app.use(express.static(publicDir));
+
+app.get('/admin', (_req, res) => {
+  res.sendFile(path.join(publicDir, 'admin.html'));
+});
+
+app.get('/giveaway', (_req, res) => {
+  res.sendFile(path.join(publicDir, 'giveaway.html'));
+});
 
 app.get('*', (req, res, next) => {
   if (req.path.startsWith('/api/')) return next();
   res.sendFile(path.join(publicDir, 'index.html'));
 });
+
+try {
+  ensureStagingLedgerPrize();
+} catch (err) {
+  console.error('[redeem] failed to ensure staging ledger prize:', err.message);
+}
 
 app.listen(PORT, '0.0.0.0', () => {
   console.log(`Prize Wheel listening on http://127.0.0.1:${PORT}`);
