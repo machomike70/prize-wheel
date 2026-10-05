@@ -1,6 +1,79 @@
 (() => {
   'use strict';
 
+  function apiBase() {
+    if (window.PrizeWheelAdminSession && window.PrizeWheelAdminSession.apiBase) {
+      return window.PrizeWheelAdminSession.apiBase();
+    }
+    const path = location.pathname || '';
+    if (path.startsWith('/wheel-staging')) return '/wheel-staging';
+    if (path.startsWith('/wheel')) return '/wheel';
+    return '';
+  }
+
+  /** Staging: admin token from shared localStorage session (no Xaman / wallet SignIn). */
+  function spinHeaders() {
+    const h = { 'Content-Type': 'application/json' };
+    if (window.PrizeWheelAdminSession && window.PrizeWheelAdminSession.readAdminToken) {
+      const t = window.PrizeWheelAdminSession.readAdminToken();
+      if (t) h['X-Admin-Token'] = t;
+    }
+    return h;
+  }
+
+  function hasAdminSession() {
+    if (ticketCode) return !ticketSpent;
+    if (window.PrizeWheelAdminSession && window.PrizeWheelAdminSession.hasAdminToken) {
+      return window.PrizeWheelAdminSession.hasAdminToken();
+    }
+    if (window.PrizeWheelAdminSession && window.PrizeWheelAdminSession.readAdminToken) {
+      return Boolean(window.PrizeWheelAdminSession.readAdminToken());
+    }
+    return false;
+  }
+
+  function ensureViewerSpinHint() {
+    let hint = document.getElementById('viewerSpinHint');
+    if (!hint && els.spinBtn && els.spinBtn.parentElement) {
+      hint = document.createElement('p');
+      hint.id = 'viewerSpinHint';
+      hint.className = 'viewer-spin-hint';
+      hint.setAttribute('role', 'status');
+      els.spinBtn.parentElement.insertAdjacentElement('afterend', hint);
+    }
+    return hint;
+  }
+
+  function syncViewerSpinMessage() {
+    const hint = ensureViewerSpinHint();
+    const label = els.spinBtn && els.spinBtn.querySelector('.spin-label');
+    if (ticketCode) {
+      if (hint) {
+        hint.hidden = false;
+        hint.textContent = ticketSpent
+          ? 'This spin code has been used. Your prize code: ' + ticketCode
+          : 'Spin code ' + ticketCode + ' — one spin. Your prize code appears when the wheel stops.';
+      }
+      if (label) label.textContent = ticketSpent ? 'USED' : 'SPIN';
+      return;
+    }
+    if (hasAdminSession()) {
+      if (hint) {
+        hint.hidden = true;
+        hint.textContent = '';
+      }
+      if (label) label.textContent = 'SPIN';
+      return;
+    }
+    if (hint) {
+      hint.hidden = false;
+      hint.textContent =
+        'View only — watch the wheel and results. Only admins can spin (sign in via /wheel-staging/admin).';
+    }
+    if (label) label.textContent = 'VIEW ONLY';
+  }
+
+
   // Casino roulette palette: red / black alternating; gold for odd leftover
   const RED = '#c41e3a';
   const BLACK = '#1a1a1a';
@@ -40,6 +113,11 @@
   const autoclose = params.get('autoclose') === '1';
   const controlsOff = params.get('controls') === '0';
   const modeParam = params.get('mode');
+  // Spin-ticket mode: /?code=XXXX-XXXX-XX&mode=prizes[&site=shop] — customer spends one ticket,
+  // server spins over the configured prize list (GET /api/prizes) and returns the prize code.
+  const ticketCode = (params.get('code') || '').trim();
+  const ticketSite = params.get('site') === 'shop' || params.get('site') === 'goml' ? params.get('site') : '';
+  let ticketSpent = false;
 
   const els = {
     app: document.getElementById('app'),
@@ -51,6 +129,7 @@
     winnerOverlay: document.getElementById('winnerOverlay'),
     winnerLabel: document.getElementById('winnerLabel'),
     sigPreview: document.getElementById('sigPreview'),
+    prizeCodeInfo: document.getElementById('prizeCodeInfo'),
     closeOverlay: document.getElementById('closeOverlay'),
     emptyHint: document.getElementById('emptyHint'),
     listEmpty: document.getElementById('listEmpty'),
@@ -62,12 +141,20 @@
 
   if (embed) document.body.classList.add('embed');
   if (controlsOff) document.body.classList.add('controls-hidden');
+  if (ticketCode) {
+    // Ticket mode: keep SPIN, hide the list editor + mode tabs (server owns the prize list).
+    document.body.classList.add('ticket-mode');
+    const editor = document.querySelector('.input-panel');
+    if (editor) editor.style.display = 'none';
+    if (els.modeTabs) els.modeTabs.style.display = 'none';
+  }
 
   /** @type {{ names: string[], prizes: string[], mode: 'names'|'prizes' }} */
   let state = loadState();
   if (modeParam === 'names' || modeParam === 'prizes') {
     state.mode = modeParam;
   }
+  if (ticketCode) state.mode = 'prizes';
 
   let theWheel = null;
   let spinning = false;
@@ -106,6 +193,7 @@
   }
 
   function saveState() {
+    if (ticketCode) return; // ticket mode shows the server prize list; never overwrite local lists
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify({
         names: state.names,
@@ -192,8 +280,15 @@
   }
 
   function updateSpinEnabled() {
-    const ok = !spinning && currentItems().length >= 2;
+    const admin = hasAdminSession();
+    const ok = admin && !spinning && currentItems().length >= 2 && !showingSamples;
     els.spinBtn.disabled = !ok;
+    if (els.spinBtn) {
+      els.spinBtn.title = admin
+        ? 'Spin the wheel'
+        : 'Admin session required to spin — viewers can watch only';
+    }
+    syncViewerSpinMessage();
   }
 
   function segmentTexts() {
@@ -546,7 +641,7 @@
 
     const { result, signature } = lastProof;
     setTimeout(() => {
-      showWinner(result.label, signature);
+      showWinner(result.label, signature, prizeInfoText(lastProof));
       fireConfetti();
     }, 220);
 
@@ -559,8 +654,28 @@
     if (window.PrizeWheelTG) window.PrizeWheelTG.sync();
   }
 
-  function showWinner(label, signature) {
+  function prizeInfoText(proof) {
+    if (!proof) return '';
+    const p = proof.prize || {};
+    if (proof.redeemCode) {
+      return 'XRP prize! Redeem code: ' + proof.redeemCode + '\nRedeem with your XRPL address at ' +
+        location.origin + apiBase() + '/redeem.html';
+    }
+    if (p.type === 'none') return 'No prize this time — thanks for playing!';
+    if (proof.prizeCode) {
+      let how = 'Use this code at checkout.';
+      if (p.fulfillment === 'manual' || p.fulfillment === 'shop_checkout_or_manual') how = 'Keep this code — we will use it to deliver your prize.';
+      return 'Your prize code: ' + proof.prizeCode + '\n' + how;
+    }
+    return '';
+  }
+
+  function showWinner(label, signature, info) {
     els.winnerLabel.textContent = label;
+    if (els.prizeCodeInfo) {
+      els.prizeCodeInfo.textContent = info || '';
+      els.prizeCodeInfo.classList.toggle('hidden', !info);
+    }
     const trunc =
       signature.length > 20
         ? signature.slice(0, 10) + '…' + signature.slice(-8)
@@ -625,6 +740,13 @@
     const items = currentItems();
     if (items.length < 2 || spinning) return;
     if (showingSamples) return;
+    if (!hasAdminSession()) {
+      syncViewerSpinMessage();
+      alert(ticketCode
+        ? 'This spin code has already been used.'
+        : 'Admin access required to spin. Open /wheel-staging/admin and enter the admin token.');
+      return;
+    }
 
     spinning = true;
     updateSpinEnabled();
@@ -633,14 +755,33 @@
     lastProof = null;
     if (els.pointer) els.pointer.classList.remove('tick', 'land');
     try {
-      const res = await fetch('/api/spin', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ mode: state.mode, items }),
-      });
+      const res = ticketCode
+        ? await fetch(apiBase() + '/api/tickets/spin', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'same-origin',
+          body: JSON.stringify({ code: ticketCode, site: ticketSite || undefined }),
+        })
+        : await fetch(apiBase() + '/api/spin', {
+          method: 'POST',
+          headers: spinHeaders(),
+          credentials: 'same-origin',
+          body: JSON.stringify({ mode: state.mode, items }),
+        });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
+        if (ticketCode && res.status === 409) { ticketSpent = true; }
         throw new Error(data.error || 'Spin failed');
+      }
+      if (ticketCode) {
+        ticketSpent = true;
+        // Server spins over its own prize list; make sure the wheel shows exactly those segments.
+        if (Array.isArray(data.result && data.result.items) &&
+            JSON.stringify(data.result.items) !== JSON.stringify(state.prizes)) {
+          state.prizes = data.result.items.slice();
+          updateList();
+          buildWheel();
+        }
       }
       if (
         !data.result ||
@@ -650,7 +791,13 @@
         throw new Error('Bad spin response');
       }
 
-      lastProof = { result: data.result, signature: data.signature };
+      lastProof = {
+        result: data.result,
+        signature: data.signature,
+        prize: data.prize || null,
+        prizeCode: data.prizeCode || null,
+        redeemCode: data.redeemCode || null,
+      };
 
       // Force wheel to server-chosen segment (Winwheel segments are 1-based)
       const prizeNumber = data.result.index + 1;
@@ -748,7 +895,7 @@
   // Public API for tg.js
   window.PrizeWheel = {
     spin: requestSpin,
-    canSpin: () => !spinning && currentItems().length >= 2,
+    canSpin: () => hasAdminSession() && !spinning && currentItems().length >= 2 && !showingSamples,
     isSpinning: () => spinning,
   };
 
@@ -756,4 +903,39 @@
   updateTabs();
   updateList();
   buildWheel();
+
+  /** Configured prize list (admin-managed). Used in ticket mode, and in prizes mode when the
+   *  local list was never customised (still the built-in defaults). */
+  async function loadServerPrizes() {
+    const untouched = JSON.stringify(state.prizes) === JSON.stringify(DEFAULT_PRIZES);
+    if (!ticketCode && !untouched) return;
+    try {
+      const res = await fetch(apiBase() + '/api/prizes', { credentials: 'same-origin' });
+      const data = await res.json();
+      if (!res.ok || !Array.isArray(data.labels) || data.labels.length < 2) return;
+      state.prizes = data.labels.slice();
+      if (ticketCode) {
+        const lk = await fetch(apiBase() + '/api/tickets/lookup?code=' + encodeURIComponent(ticketCode));
+        const t = await lk.json().catch(() => ({}));
+        if (lk.ok && t.used) {
+          ticketSpent = true;
+          if (t.prizeResult && Array.isArray(t.prizeResult.items)) state.prizes = t.prizeResult.items;
+          setTimeout(() => showWinner(t.prizeResult ? t.prizeResult.label : 'Used', t.prizeResult && t.prizeResult.signature || '',
+            t.prizeType === 'none' ? 'This spin code was already used (no prize).' :
+              t.ledgerRedeemCode ? 'XRP prize — redeem code: ' + t.ledgerRedeemCode :
+                'This spin code was already used. Your prize code: ' + t.code), 300);
+        } else if (!lk.ok) {
+          ticketSpent = true;
+          alert('Unknown spin code. Check the link or contact support.');
+        }
+      }
+      if (!spinning) {
+        updateTabs();
+        updateList();
+        buildWheel();
+        updateSpinEnabled();
+      }
+    } catch { /* offline: keep local list */ }
+  }
+  loadServerPrizes();
 })();

@@ -510,3 +510,8 @@ Same as main prize-wheel project (check parent LICENSE file).
 **Last Updated:** 2026-09-30  
 **Branch:** staging/payout-hot-wallet-98fc  
 **Maintainer:** Cursor AI Cloud Agent
+
+## Prize codes (purchase / discount prizes)
+
+Admin UI: `/wheel-staging/prizes.html` — add/edit prizes (5% off, 10% off, free shipping, free tee, …),
+issue codes, mint spin tickets, look up / redeem. Full guide: `docs/PRIZE-CODES.md`.

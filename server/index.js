@@ -44,6 +44,8 @@ const {
   listRedeems,
 } = require('./redeem');
 const stagingSender = require('./stagingSender');
+const prizeRoutes = require('./prizeRoutes');
+const { ensurePrizeCatalog } = require('./prizeCatalog');
 const { getHotWalletStatus } = require('./walletStatus');
 const hotWallet = require('./hotWallet');
 
@@ -92,13 +94,19 @@ app.post('/api/spin', spinLimiter, requireAdmin, (req, res) => {
   }
   const out = createSpin(norm.mode, norm.items);
   const ledger = attachLedgerRedeem(out.result);
+  const coupon = prizeRoutes.attachPrizeCodeForAdminSpin(out.result, out.signature, req.body?.site);
   return res.json({
     ...out,
     redeemCode: ledger.redeemCode,
     ledgerDelivery: ledger.ledgerDelivery,
     redeem: ledger.redeem,
+    prizeCode: coupon ? coupon.prizeCode : null,
+    prize: coupon ? coupon.prize : null,
   });
 });
+
+// Prize catalog ("prize codes"), spin tickets, direct-issue codes, redeem.
+prizeRoutes.mount(app, { requireAdmin });
 
 function handleVerify(req, res) {
   const rawPayload = req.method === 'GET' ? req.query.payload : req.body?.payload ?? req.body?.result;
@@ -763,6 +771,10 @@ app.get('/admin', (_req, res) => {
   res.sendFile(path.join(publicDir, 'admin.html'));
 });
 
+app.get('/prizes', (_req, res) => {
+  res.sendFile(path.join(publicDir, 'prizes.html'));
+});
+
 app.get('/giveaway', (_req, res) => {
   res.sendFile(path.join(publicDir, 'giveaway.html'));
 });
@@ -776,6 +788,11 @@ try {
   ensureStagingLedgerPrize();
 } catch (err) {
   console.error('[redeem] failed to ensure staging ledger prize:', err.message);
+}
+try {
+  ensurePrizeCatalog();
+} catch (err) {
+  console.error('[prizes] failed to ensure prize catalog:', err.message);
 }
 
 app.listen(PORT, '0.0.0.0', () => {

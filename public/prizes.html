@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <title>Staging Admin — Prize Codes</title>
+  <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700;800&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <style>
+    :root { --line: #3a4a3a; --muted: #a8b8a0; --accent: #d4af37; }
+    body { background: #0a1a0f; color: #e8f0e4; font-family: Inter, system-ui, sans-serif; margin: 0; }
+    .wrap { max-width: 900px; margin: 0 auto; padding: 1.25rem; }
+    h1 { font-family: Cinzel, serif; color: var(--accent); font-size: 1.5rem; margin: 0 0 0.35rem; }
+    .sub { color: var(--muted); font-size: 0.9rem; margin: 0 0 1.25rem; }
+    .card { background: #122018; border: 1px solid var(--accent); border-radius: 12px; padding: 1.1rem 1.25rem; margin-bottom: 1rem; }
+    .card h2 { font-size: 1.1rem; margin: 0 0 0.75rem; color: var(--accent); }
+    label { display: block; font-size: 0.78rem; color: var(--muted); margin: 0.5rem 0 0.25rem; }
+    input, select { width: 100%; box-sizing: border-box; padding: 0.55rem 0.7rem; border-radius: 8px; border: 1px solid var(--line); background: #0b1220; color: #e8f0e4; font: inherit; }
+    input[type=checkbox] { width: auto; }
+    .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 0 0.75rem; }
+    .row { display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: center; margin-top: 0.75rem; }
+    button { padding: 0.55rem 0.9rem; border-radius: 8px; border: none; cursor: pointer; font-weight: 700; background: linear-gradient(135deg, #d4af37, #f0d78c); color: #1a1200; }
+    button.secondary { background: #1e2e24; color: #e8f0e4; border: 1px solid var(--line); font-weight: 600; }
+    button.danger { background: #5a1f1b; color: #ffd6d6; border: 1px solid #8b4513; font-weight: 600; }
+    button.small { padding: 0.3rem 0.55rem; font-size: 0.78rem; }
+    table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
+    th, td { text-align: left; padding: 0.45rem 0.4rem; border-bottom: 1px solid var(--line); vertical-align: middle; }
+    th { color: var(--muted); font-weight: 600; font-size: 0.75rem; text-transform: uppercase; }
+    tr.disabled td { opacity: 0.5; }
+    .msg { margin-top: 0.6rem; font-size: 0.85rem; min-height: 1.2em; white-space: pre-wrap; }
+    .msg.ok { color: #7dcea0; } .msg.err { color: #f1948a; }
+    .hidden { display: none !important; }
+    .note { font-size: 0.78rem; color: var(--muted); line-height: 1.45; }
+    code, .mono { font-family: ui-monospace, monospace; }
+    .codes { font-family: ui-monospace, monospace; background: #0b1220; border: 1px solid var(--line); border-radius: 8px; padding: 0.6rem; white-space: pre-wrap; word-break: break-all; font-size: 0.85rem; }
+    a.link { color: var(--accent); }
+    .pill { display: inline-block; font-size: 0.7rem; padding: 0.1rem 0.45rem; border-radius: 999px; background: #1e2e24; border: 1px solid var(--line); }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <h1>Staging · Prize Codes</h1>
+    <p class="sub">
+      Configure wheel prizes (5% off, 10% off, free shipping, free tee …), issue codes, mint spin tickets, redeem.
+      <a class="link" href="./">Wheel</a> · <a class="link" href="./admin">Spaces admin</a> · <a class="link" href="./redeem.html">XRP redeem</a>
+    </p>
+
+    <div class="card" id="gate">
+      <h2>Admin auth</h2>
+      <label for="tokenInput">Admin token (X-Admin-Token)</label>
+      <input id="tokenInput" type="password" autocomplete="current-password" placeholder="Paste ADMIN_TOKEN" />
+      <div class="row"><button type="button" id="authBtn">Unlock</button></div>
+      <div class="msg err" id="gateMsg"></div>
+    </div>
+
+    <div id="main" class="hidden">
+      <div class="card">
+        <h2>1 · Wheel prizes</h2>
+        <table>
+          <thead><tr><th>On wheel</th><th>Label</th><th>Type</th><th>Value</th><th>Checkout effect</th><th></th></tr></thead>
+          <tbody id="prizeRows"><tr><td colspan="6">Loading…</td></tr></tbody>
+        </table>
+        <div class="msg" id="listMsg"></div>
+      </div>
+
+      <div class="card">
+        <h2 id="formTitle">2 · Add a prize code</h2>
+        <input type="hidden" id="editId" />
+        <div class="grid">
+          <div><label for="fLabel">Wheel label (max 80)</label><input id="fLabel" placeholder="e.g. 15% Off" maxlength="80" /></div>
+          <div><label for="fType">Type</label><select id="fType"></select></div>
+          <div><label for="fValue" id="fValueLabel">Value</label><input id="fValue" type="number" step="0.01" min="0" placeholder="15" /></div>
+          <div><label for="fSku">SKU (free item, optional)</label><input id="fSku" placeholder="first-edition-tee" /></div>
+        </div>
+        <label for="fNote">Note (optional, admin only)</label><input id="fNote" maxlength="200" />
+        <label><input type="checkbox" id="fEnabled" checked /> Show on wheel</label>
+        <div class="row">
+          <button type="button" id="saveBtn">Add prize</button>
+          <button type="button" class="secondary hidden" id="cancelEditBtn">Cancel edit</button>
+        </div>
+        <div class="msg" id="formMsg"></div>
+        <p class="note">
+          Percent = % off merch subtotal (1–100). Fixed = USD off merch. Free shipping zeroes shipping.
+          Free item records the SKU for fulfilment. Token / NFT / mystery / other are fulfilled by hand (redeem the code when delivered).
+          XRP = on-ledger prize (staging: testnet only). Try Again = no code.
+        </p>
+      </div>
+
+      <div class="card">
+        <h2>3 · Issue codes for a prize</h2>
+        <div class="grid">
+          <div><label for="iPrize">Prize</label><select id="iPrize"></select></div>
+          <div><label for="iCount">How many</label><input id="iCount" type="number" min="1" max="100" value="1" /></div>
+          <div><label for="iSite">Site</label><select id="iSite"><option value="shop">shop</option><option value="goml">goml</option></select></div>
+          <div><label for="iOrder">Order / note (optional)</label><input id="iOrder" maxlength="120" /></div>
+        </div>
+        <div class="row"><button type="button" id="issueBtn">Issue code(s)</button></div>
+        <div class="msg" id="issueMsg"></div>
+        <div class="codes hidden" id="issueOut"></div>
+      </div>
+
+      <div class="card">
+        <h2>4 · Mint spin tickets (customer spins the wheel)</h2>
+        <div class="grid">
+          <div><label for="tCount">How many</label><input id="tCount" type="number" min="1" max="200" value="1" /></div>
+          <div><label for="tSite">Site</label><select id="tSite"><option value="shop">shop</option><option value="goml">goml</option></select></div>
+          <div><label for="tOrder">Order ID (optional)</label><input id="tOrder" maxlength="120" /></div>
+        </div>
+        <div class="row"><button type="button" id="mintBtn">Mint ticket(s)</button></div>
+        <div class="msg" id="mintMsg"></div>
+        <div class="codes hidden" id="mintOut"></div>
+        <p class="note">Each ticket = one spin. After the spin, the same code is the customer's prize code (shop checkout looks it up).</p>
+      </div>
+
+      <div class="card">
+        <h2>5 · Look up / redeem a code</h2>
+        <div class="grid">
+          <div><label for="rCode">Code</label><input id="rCode" class="mono" placeholder="ABCD-EFGH-JK" /></div>
+          <div><label for="rSub">Merch subtotal $ (quote)</label><input id="rSub" type="number" step="0.01" min="0" value="50" /></div>
+          <div><label for="rShip">Shipping $ (quote)</label><input id="rShip" type="number" step="0.01" min="0" value="8" /></div>
+          <div><label for="rOrder">Order ID (on redeem)</label><input id="rOrder" maxlength="120" /></div>
+        </div>
+        <div class="row">
+          <button type="button" class="secondary" id="lookupBtn">Look up</button>
+          <button type="button" id="redeemBtn">Redeem (one-time)</button>
+        </div>
+        <div class="msg" id="redeemMsg"></div>
+        <div class="codes hidden" id="redeemOut"></div>
+      </div>
+
+      <div class="card">
+        <h2>6 · Recent codes</h2>
+        <div class="row"><button type="button" class="secondary" id="recentBtn">Refresh</button></div>
+        <table>
+          <thead><tr><th>Code</th><th>Site</th><th>Prize</th><th>Status</th><th>Created (local)</th></tr></thead>
+          <tbody id="recentRows"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+  <script src="admin-session.js"></script>
+  <script src="prizes-admin.js"></script>
+</body>
+</html>

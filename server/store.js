@@ -31,6 +31,32 @@ function defaultStore() {
   };
 }
 
+/**
+ * Prizes may be plain labels (legacy) or catalog objects (see prizeCatalog.js).
+ * Object fields are preserved; prizeCatalog.js validates them.
+ */
+function coercePrize(entry) {
+  if (typeof entry === 'string') {
+    const label = entry.trim();
+    return label || null;
+  }
+  if (entry && typeof entry === 'object') {
+    const label = String(entry.label || '').trim();
+    if (!label) return null;
+    const prize = { label, ledger: entry.ledger === true, sendsEnabled: false };
+    if (typeof entry.note === 'string' && entry.note.trim()) prize.note = entry.note.trim();
+    for (const k of ['id', 'type', 'sku', 'createdAt', 'updatedAt']) {
+      if (typeof entry[k] === 'string' && entry[k].trim()) prize[k] = entry[k].trim();
+    }
+    if (Number.isFinite(Number(entry.value)) && entry.value !== null && entry.value !== '') {
+      prize.value = Number(entry.value);
+    }
+    if (typeof entry.enabled === 'boolean') prize.enabled = entry.enabled;
+    return prize;
+  }
+  return null;
+}
+
 function load() {
   if (cache) return cache;
   ensureDir();
@@ -43,11 +69,13 @@ function load() {
     const raw = fs.readFileSync(STORE_PATH, 'utf8');
     const parsed = JSON.parse(raw);
     cache = {
+      ...parsed, // keep redeems, prizeCatalogVersion and future keys across reloads
       tickets: Array.isArray(parsed.tickets) ? parsed.tickets : [],
       prizes:
         Array.isArray(parsed.prizes) && parsed.prizes.length
-          ? parsed.prizes.map(String)
+          ? parsed.prizes.map(coercePrize).filter(Boolean)
           : DEFAULT_PRIZES.slice(),
+      redeems: Array.isArray(parsed.redeems) ? parsed.redeems : [],
       payoutCodes: Array.isArray(parsed.payoutCodes) ? parsed.payoutCodes : [],
       inventory: Array.isArray(parsed.inventory) ? parsed.inventory : [],
       distributions: Array.isArray(parsed.distributions) ? parsed.distributions : [],
@@ -89,7 +117,7 @@ function getPrizes() {
 
 function setPrizes(items) {
   return update((store) => {
-    store.prizes = items.map((x) => String(x).trim()).filter((s) => s.length > 0);
+    store.prizes = items.map(coercePrize).filter(Boolean);
     return store.prizes.slice();
   });
 }
@@ -169,4 +197,5 @@ module.exports = {
   markDistributed,
   addDistribution,
   getDistributions,
+  coercePrize,
 };
