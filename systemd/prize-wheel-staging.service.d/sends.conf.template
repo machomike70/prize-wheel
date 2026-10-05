@@ -1,0 +1,8 @@
+# Staging-only: expose testnet hot wallet seed to the service as a systemd credential
+# (readable only by this unit at $CREDENTIALS_DIRECTORY/hot_wallet_seed).
+# Seed file stays root:600 and must NEVER be committed to git.
+#
+# Deploy: copy to /etc/systemd/system/prize-wheel-staging.service.d/sends.conf
+# and replace /path/to/staging-hot-wallet-seed with the real absolute path.
+[Service]
+LoadCredential=hot_wallet_seed:/path/to/staging-hot-wallet-seed
