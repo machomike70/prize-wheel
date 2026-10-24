@@ -439,6 +439,7 @@
         body: JSON.stringify({ spaceUrl, autopost: true, spacePostUrl: (window.__gomlSpacePostUrl ? window.__gomlSpacePostUrl() : '').trim() || undefined }), // SCRAPE is only reachable from the admin's tap
       });
       if (data && data.autopost) renderAutopost(data.autopost);
+      armShareLink(data && data.autopost); // Share Link: armed after any successful SCRAPE (no spin)
       return { ok: true, data };
     } catch (err) {
       return { ok: false, error: err.message };
@@ -1397,6 +1398,7 @@
       h += '</div>';
     }
     if (a.status === 'posted' || a.status === 'already') {
+      armShareLink(a);
       h += '<div class="ap-title">' + (a.status === 'posted' ? '✅ Watch link posted from @GetOffMyLawn70' : '✅ Already posted for this Space (not posted again)') +
         (a.dryRun ? ' <span class="xc-badge">SIMULATION: not really posted</span>' : '') + '</div>';
       h += '<div class="ap-card"><div class="ap-card-head"><span class="ap-av">GOML</span><div><strong>GET OFF MY LAWN</strong><div class="ap-muted">@GetOffMyLawn70 · ' +
@@ -1474,6 +1476,115 @@
     if (navigator.clipboard && window.isSecureContext) navigator.clipboard.writeText(i.value).then(ok, () => { document.execCommand('copy'); ok(); });
     else { document.execCommand('copy'); ok(); }
   });
+  // ── Permanent Share Link button (Micheal Oct 23: "when i scrape it generates a link to the live prize wheel i send it
+  //    to the space ... the wheel never spins on its own"). Pure client-side: share sheet / copy only, no spin. ──
+  const WATCH_LINK = 'https://goml.xtremerippleprotocol.online/wheel/?watch=1';
+  let shareArmed = false;
+  let sharePostUrl = '';
+  let shareWatchUrl = '';
+
+  function armShareLink(a) {
+    shareArmed = true;
+    shareWatchUrl = (a && a.watchUrl) || WATCH_LINK;
+    sharePostUrl = (a && (a.status === 'posted' || a.status === 'already') && a.url) || '';
+  
+    const btn = document.getElementById('shareLinkBtn');
+    const status = document.getElementById('shareLinkStatus');
+    const postLink = document.getElementById('shareLinkPost');
+  
+    btn.disabled = false;
+    status.textContent = '✅ Ready: live wheel link' + (sharePostUrl ? ' + GOML post' : '');
+  
+    if (sharePostUrl) {
+      postLink.href = sharePostUrl;
+      postLink.classList.remove('hidden');
+    } else {
+      postLink.classList.add('hidden');
+    }
+  }
+
+  window.__armShareLink = armShareLink;
+
+  function getShareText() {
+    let text = '🎡 Watch the GOML Prize Wheel spin live → ' + shareWatchUrl;
+    if (sharePostUrl) {
+      text += '\n' + sharePostUrl;
+    }
+    return text;
+  }
+
+  function showToast(message, duration) {
+    const toast = document.getElementById('shareLinkToast');
+    toast.textContent = message;
+    toast.classList.remove('hidden');
+    setTimeout(() => {
+      toast.classList.add('hidden');
+    }, duration);
+  }
+
+  function fallbackCopy(text) {
+    if (navigator.clipboard && window.isSecureContext) {
+      return navigator.clipboard.writeText(text);
+    } else {
+      const textarea = document.createElement('textarea');
+      textarea.value = text;
+      textarea.style.position = 'fixed';
+      textarea.style.left = '-999999px';
+      document.body.appendChild(textarea);
+      textarea.focus();
+      textarea.select();
+      try {
+        document.execCommand('copy');
+        document.body.removeChild(textarea);
+        return Promise.resolve();
+      } catch (err) {
+        document.body.removeChild(textarea);
+        return Promise.reject(err);
+      }
+    }
+  }
+
+  document.getElementById('shareLinkBtn').addEventListener('click', async function() {
+    const status = document.getElementById('shareLinkStatus');
+  
+    if (!shareArmed) {
+      status.textContent = 'Scrape first';
+      return;
+    }
+  
+    const shareText = getShareText();
+    const shareTextNoUrl = '🎡 Watch the GOML Prize Wheel spin live → ';
+  
+    if (navigator.share) {
+      try {
+        await navigator.share({
+          title: 'GOML Prize Wheel: watch live',
+          text: shareTextNoUrl,
+          url: shareWatchUrl
+        });
+      } catch (err) {
+        if (err.name === 'AbortError') {
+          return;
+        }
+        try {
+          await fallbackCopy(shareText);
+          showToast('Copied ✓', 1800);
+          status.textContent = 'Copied: paste it into the Space';
+        } catch (copyErr) {
+          console.error('Copy failed:', copyErr);
+        }
+      }
+    } else {
+      try {
+        await fallbackCopy(shareText);
+        showToast('Copied ✓', 1800);
+        status.textContent = 'Copied: paste it into the Space';
+      } catch (err) {
+        console.error('Copy failed:', err);
+      }
+    }
+  });
+
   adoptQueryTokens();
   boot();
 })();

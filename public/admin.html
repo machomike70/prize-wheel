@@ -128,6 +128,79 @@
     .autopost .ap-copy{display:flex;gap:.4rem}.autopost .ap-copy input{flex:1;min-width:0;font:12px monospace}
     .autopost .ap-alt{font-size:.78rem;text-align:center;margin-top:.35rem}.autopost .ap-alt a{color:#c4b5fd}
     .autopost .ap-warn{margin-top:.5rem;padding:.5rem;border-radius:8px;background:#3a1f1b;color:#ffb3b3;font-size:.82rem}
+    /* Share Link button */
+.share-link-box {
+  margin-top: 1rem;
+}
+
+.share-link-btn {
+  width: 100%;
+  background: linear-gradient(135deg, #7c3aed, #9333ea);
+  color: white;
+  font-size: 1.35rem;
+  font-weight: bold;
+  padding: 1rem;
+  border: none;
+  border-radius: 999px;
+  box-shadow: 0 4px 12px rgba(124, 58, 237, 0.4);
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.share-link-btn:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 16px rgba(124, 58, 237, 0.5);
+}
+
+.share-link-btn:disabled {
+  background: #4c3a73;
+  opacity: 0.75;
+  cursor: not-allowed;
+  box-shadow: none;
+}
+
+.share-link-status {
+  text-align: center;
+  font-size: 0.85rem;
+  margin-top: 0.5rem;
+  color: #888;
+}
+
+.share-link-post {
+  display: block;
+  text-align: center;
+  font-size: 0.85rem;
+  color: #c4b5fd;
+  margin-top: 0.5rem;
+  text-decoration: none;
+}
+
+.share-link-post:hover {
+  text-decoration: underline;
+}
+
+.share-link-toast {
+  position: fixed;
+  bottom: 24px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: #111;
+  color: white;
+  padding: 0.75rem 1.5rem;
+  border-radius: 999px;
+  font-size: 0.9rem;
+  font-weight: 500;
+  z-index: 9999;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+
+.share-link-box .hidden {
+  display: none;
+}
+
+.share-link-toast.hidden {
+  display: none;
+}
   </style>
 </head>
 <body>
@@ -177,6 +250,13 @@
       <div class="live-controls">
         <button type="button" class="big scrape-btn" id="refreshSpace">📥 SCRAPE</button>
         <button type="button" class="big spin-btn" id="spaceGoLive">🎰 SPIN</button>
+      </div>
+      <!-- Permanent Share Link (Micheal Oct 23): armed after SCRAPE with the live wheel watch link; never spins -->
+      <div id="shareLinkBox" class="share-link-box">
+        <button type="button" id="shareLinkBtn" class="share-link-btn" disabled>🔗 Share Link</button>
+        <div id="shareLinkStatus" class="share-link-status">Scrape first</div>
+        <a id="shareLinkPost" class="share-link-post hidden" target="_blank" rel="noopener">Open GOML post in X</a>
+        <div id="shareLinkToast" class="share-link-toast hidden" role="status">Copied ✓</div>
       </div>
       <p class="hint">SCRAPE loads the room's names onto the wheel (no spin). SPIN spins only when you tap it.</p>
       <div id="autopostBox" class="autopost hidden" aria-live="polite"></div>
@@ -405,6 +485,6 @@
   </div>
 
   <script src="prize-wallet-panel.js?v=20261015"></script>
-  <script src="admin.js?v=spacereply-20261023"></script>
+  <script src="admin.js?v=sharelink-20261023"></script>
 </body>
 </html>

@@ -99,7 +99,9 @@ async function findSpacePosts(spaceId, scrape, excludeIds) {
           return new Date(b.createdAt) - new Date(a.createdAt);
         }
       });
-    const max = Number(env('AUTOPOST_REPLY_MAX', '10'));
+    const ownerFirst = (p) => (String(p.username || '').toLowerCase() === 'mmozley70' ? 1 : 0);
+    posts.sort((a, b) => ownerFirst(b) - ownerFirst(a));
+    const max = Number(env('AUTOPOST_REPLY_MAX', '3'));
     return { posts: posts.slice(0, max) };
   } catch (err) {
     return { posts: [], error: err.message };
