@@ -180,6 +180,8 @@
       </div>
       <p class="hint">SCRAPE loads the room's names onto the wheel (no spin). SPIN spins only when you tap it.</p>
       <div id="autopostBox" class="autopost hidden" aria-live="polite"></div>
+      <label for="spacePostUrl" style="margin-top:0.3rem;font-size:.85rem">Space post URL (optional: only if no Space post is found automatically)</label>
+      <input id="spacePostUrl" type="text" inputmode="url" autocomplete="off" placeholder="https://x.com/MMozley70/status/… (post that shared the Space)" />
       <label for="claimPrize" id="claimPrizeLabel" style="margin-top:0.4rem">🎁 Prize for the winner (DM'd automatically 30s after SPIN)</label>
       <select id="claimPrize"><option value="">No auto DM (just pick a winner)</option></select>
 
@@ -403,6 +405,6 @@
   </div>
 
   <script src="prize-wallet-panel.js?v=20261015"></script>
-  <script src="admin.js?v=autopost70-20261018"></script>
+  <script src="admin.js?v=spacereply-20261023"></script>
 </body>
 </html>
