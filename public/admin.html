@@ -259,6 +259,17 @@
         <div id="shareLinkToast" class="share-link-toast hidden" role="status">Copied ✓</div>
       </div>
       <p class="hint">SCRAPE loads the room's names onto the wheel (no spin). SPIN spins only when you tap it.</p>
+      <!-- Post giveaway (Micheal Oct 24): paste any X post link -> likes + reposts load onto the wheel. Never spins, never posts. -->
+      <details class="post-giveaway" id="postGiveawayBox" open style="margin:0.5rem 0 0.75rem;padding:0.55rem 0.7rem;border:2px solid #38bdf8;border-radius:10px;background:#071a24">
+        <summary style="font-weight:700;cursor:pointer">🎁 Post giveaway: scrape likes + reposts from any X post</summary>
+        <input id="pgUrl" type="text" inputmode="url" autocomplete="off" placeholder="https://x.com/user/status/… (any post, polls too)" style="margin-top:0.45rem" />
+        <label class="check" style="font-size:0.8rem"><input type="checkbox" id="pgReplies" /> Include people who replied (X search: last ~7 days only)</label>
+        <label class="check" style="font-size:0.8rem"><input type="checkbox" id="pgExclude" checked /> Leave out the post author, @GetOffMyLawn70 and @MMozley70</label>
+        <button type="button" class="big scrape-btn" id="pgScrapeBtn" style="width:100%;margin-top:0.35rem">📥 Scrape post</button>
+        <div class="msg" id="pgMsg"></div>
+        <div id="pgCounts" class="hint" style="margin:0.2rem 0 0"></div>
+        <p class="hint" style="margin:0.25rem 0 0">Loads names onto the wheel only. Nothing spins until you tap SPIN; nothing is posted to X. Poll voters are private on X, so a poll's likes + reposts are used.</p>
+      </details>
       <div id="autopostBox" class="autopost hidden" aria-live="polite"></div>
       <label for="spacePostUrl" style="margin-top:0.3rem;font-size:.85rem">Space post URL (optional: only if no Space post is found automatically)</label>
       <input id="spacePostUrl" type="text" inputmode="url" autocomplete="off" placeholder="https://x.com/MMozley70/status/… (post that shared the Space)" />
@@ -485,6 +496,6 @@
   </div>
 
   <script src="prize-wallet-panel.js?v=20261015"></script>
-  <script src="admin.js?v=sharelink-20261023"></script>
+  <script src="admin.js?v=postgiveaway-20261024"></script>
 </body>
 </html>

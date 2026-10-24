@@ -1585,6 +1585,68 @@
     }
   });
 
+  // ── Post giveaway (Micheal Oct 24: "a giveaway from any post"). Paste a post link -> likers + reposters (+ optional
+  //    repliers) load onto the wheel exactly like a Space scrape: idle preview only, NEVER spins, never posts to X. ──
+  (function initPostGiveaway() {
+    const btn = document.getElementById('pgScrapeBtn');
+    if (!btn) return;
+    const urlEl = document.getElementById('pgUrl');
+    const msgEl = document.getElementById('pgMsg');
+    const countsEl = document.getElementById('pgCounts');
+    const esc = (s) => String(s == null ? '' : s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+    btn.addEventListener('click', async () => {
+      const postUrl = urlEl.value.trim();
+      if (!/(?:x|twitter)\.com\/.+\/status\/\d+|^\d{5,25}$/.test(postUrl)) {
+        showMsg(msgEl, 'Paste an X post link like https://x.com/user/status/123…', false);
+        return;
+      }
+      btn.disabled = true;
+      countsEl.innerHTML = '';
+      showMsg(msgEl, 'Scraping post (names only, no spin)…', true);
+      try {
+        const d = await api('/api/admin/post-giveaway/scrape', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ postUrl, includeReplies: !!document.getElementById('pgReplies').checked, excludeHosts: !!document.getElementById('pgExclude').checked }),
+        });
+        const c = d.counts || {}; const m = d.metrics || {};
+        let h = '❤️ Likes <b>' + c.likes + '</b>' + (m.likes != null ? ' of ' + m.likes : '') +
+          ' · 🔁 Reposts <b>' + c.reposts + '</b>' + (m.reposts != null ? ' of ' + m.reposts : '') +
+          (c.replies != null ? ' · 💬 Repliers <b>' + c.replies + '</b>' : '') +
+          ' · <b>' + c.unique + '</b> unique';
+        if (d.excluded && d.excluded.length) h += '<br>Left out: ' + d.excluded.map(esc).join(', ');
+        if (d.warnings && d.warnings.length) h += '<br>⚠️ ' + d.warnings.map(esc).join('<br>⚠️ ');
+        countsEl.innerHTML = h;
+        const names = d.names || [];
+        if (names.length < 2) {
+          showMsg(msgEl, 'Only ' + names.length + ' eligible name' + (names.length === 1 ? '' : 's') + ' from that post — need at least 2 to spin.', false);
+          return;
+        }
+        const title = 'Post giveaway: ' + (d.author || 'X post');
+        const data = { spaceId: 'post-' + d.tweetId, spaceData: { title }, hosts: [], speakers: [], listeners: [], names, total: names.length, hasListeners: true, source: 'post', post: { url: d.url, counts: c } };
+        currentSpaceNames = names.slice();
+        currentSpaceData = data;
+        lastLoad = { id: data.spaceId, at: Date.now() };
+        ssSet(SPACE_NAMES_KEY, JSON.stringify(currentSpaceNames));
+        ssSet(SPACE_DATA_KEY, JSON.stringify(data));
+        ssSet(SPACE_DATA_AT_KEY, String(Date.now()));
+        els.spaceParticipantCount.textContent = String(names.length);
+        els.spaceBreakdown.textContent = c.likes + ' likes, ' + c.reposts + ' reposts' + (c.replies != null ? ', ' + c.replies + ' repliers' : '') + ' → ' + names.length + ' unique';
+        els.spaceLastSync.textContent = 'Post scraped ' + new Date().toLocaleTimeString();
+        els.spaceWarning.classList.add('hidden');
+        setSpaceStatus('🎁 ' + title + ' — ' + names.length + ' names loaded', 'live');
+        const pushed = await pushNamesPreview(currentSpaceNames, title, { auto: false });
+        armShareLink(null); // same watch link; post scrape never auto-posts or replies on X
+        showMsg(msgEl, '✓ Loaded ' + names.length + ' names from ' + (d.author || 'the post') + (pushed ? ' onto the wheel' : '') + '. Tap SPIN when ready.', true);
+        showMsg(els.spaceMsg, '✓ ' + title + ': ' + names.length + ' names loaded' + (pushed ? ' onto the wheel' : '') + '. Tap SPIN when ready.', true);
+      } catch (err) {
+        showMsg(msgEl, '⚠️ ' + (err.message || 'Post scrape failed'), false);
+      } finally {
+        btn.disabled = false;
+      }
+    });
+  })();
+
   adoptQueryTokens();
   boot();
 })();
