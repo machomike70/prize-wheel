@@ -52,6 +52,7 @@ module.exports = {
   configured: () => !!creds(),
   usage,
   me: () => call('GET', API + '/users/me', null, 'reads'),
+  get: (url) => call('GET', String(url), null, 'reads'), // read-only GET (post giveaway likes, Oct 24)
   userByUsername: (u) => call('GET', API + '/users/by/username/' + encodeURIComponent(u), null, 'reads'),
   sendDm: (userId, text) => call('POST', API + '/dm_conversations/with/' + encodeURIComponent(userId) + '/messages', { text }, 'sends'),
   dmEvents: (paginationToken) => call('GET', API + '/dm_events?event_types=MessageCreate&max_results=50&dm_event.fields=id,text,sender_id,created_at,dm_conversation_id' + (paginationToken ? '&pagination_token=' + encodeURIComponent(paginationToken) : ''), null, 'reads'),

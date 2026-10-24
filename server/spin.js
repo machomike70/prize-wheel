@@ -58,8 +58,8 @@ function normalizeRequest(body) {
   if (items.length < 2) {
     return { ok: false, error: 'Need at least 2 non-empty items', status: 400 };
   }
-  if (items.length > 100) {
-    return { ok: false, error: 'Too many items (max 100)', status: 400 };
+  if (items.length > 1000) { // raised from 100 for post giveaways (Oct 24)
+    return { ok: false, error: 'Too many items (max 1000)', status: 400 };
   }
   for (const s of items) {
     if (s.length > 80) {

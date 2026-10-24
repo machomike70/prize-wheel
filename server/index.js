@@ -556,6 +556,8 @@ app.get('/api/admin/spaces/goml-live', requireAdmin, spaceDetectLimiter, async (
 
 // Per-admin "My X handle" for Space tracking (GET/PUT /api/admin/me/x)
 adminX.mount(app, { requireAdmin, limiter: spaceDetectLimiter });
+// Post giveaway: scrape likes/reposts (+opt. replies) of any X post -> names only. Read-only, never spins or posts.
+require("./postGiveaway").mount(app, { requireAdmin, limiter: scrapeLimiter });
 
 app.get('/api/admin/status', requireAdmin, (req, res) => {
   res.json({
