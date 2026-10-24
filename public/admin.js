@@ -436,7 +436,7 @@
     try {
       const data = await api('/api/admin/spaces/scrape', {
         method: 'POST',
-        body: JSON.stringify({ spaceUrl, autopost: true }), // SCRAPE is only reachable from the admin's tap
+        body: JSON.stringify({ spaceUrl, autopost: true, spacePostUrl: (window.__gomlSpacePostUrl ? window.__gomlSpacePostUrl() : '').trim() || undefined }), // SCRAPE is only reachable from the admin's tap
       });
       if (data && data.autopost) renderAutopost(data.autopost);
       return { ok: true, data };
@@ -1382,14 +1382,20 @@
   //    link to the spaces jumbo"; "Goml 70"; "I would rather bring traffic to the GOML website") ─────────────────
   const apBox = document.getElementById('autopostBox');
   const PIN_HINT = 'With the Space open: Share → Share to Space, then pin it';
+  let lastApKey = '';
   function linkify(t) {
     return escH(t).replace(/(https:\/\/[^\s<]+)/g, '<span class="ap-link">$1</span>');
   }
-  function renderAutopost(a) {
+  function renderAutopost(a, meta) {
     if (!apBox) return;
-    if (!a || a.status === 'disabled' || a.status === 'skipped') { apBox.classList.add('hidden'); apBox.innerHTML = ''; return; }
+    if (!a || a.status === 'disabled' || a.status === 'skipped') { apBox.classList.add('hidden'); apBox.innerHTML = ''; lastApKey = ''; return; }
     apBox.classList.remove('hidden');
     let h = '';
+    if (meta && meta.shared) {
+      h += '<div style="font-size:.8rem;color:#94a3b8;margin-bottom:.3rem">Scraped by ' + (meta.scrapedBy ? '@' + escH(meta.scrapedBy) : 'another admin');
+      if (meta.at) h += ' · ' + escH(new Date(meta.at).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }));
+      h += '</div>';
+    }
     if (a.status === 'posted' || a.status === 'already') {
       h += '<div class="ap-title">' + (a.status === 'posted' ? '✅ Watch link posted from @GetOffMyLawn70' : '✅ Already posted for this Space (not posted again)') +
         (a.dryRun ? ' <span class="xc-badge">SIMULATION: not really posted</span>' : '') + '</div>';
@@ -1401,14 +1407,63 @@
       h += '<div class="ap-hint">' + escH(PIN_HINT) + '</div>';
       h += '<div class="ap-copy"><input readonly id="apPostUrl" value="' + escH(a.url) + '" aria-label="Post link"><button type="button" data-ap="copy">Copy</button></div>';
       h += '<div class="ap-alt"><a href="' + escH(a.appUrl) + '">Open in the X app instead</a> · <a href="' + escH(a.watchUrl) + '" target="_blank" rel="noopener">Open watch page</a></div>';
-      if (a.warning) h += '<div class="ap-warn">⚠️ ' + escH(a.warning) + '</div>';
+      if (a.warning && !(meta && meta.shared)) h += '<div class="ap-warn">⚠️ ' + escH(a.warning) + '</div>';
+      if (a.replies) {
+        if (!document.getElementById('ap-replies-css')) {
+          const st = document.createElement('style');
+          st.id = 'ap-replies-css';
+          st.textContent = '.ap-replies{margin-top:.6rem;font-size:.85rem}.ap-r{padding:.25rem 0}.ap-r a{color:#c4b5fd}';
+          document.head.appendChild(st);
+        }
+        h += '<div class="ap-replies">';
+        h += '<div style="font-weight:600;margin-bottom:.3rem">💬 Also replied under the Space post(s):</div>';
+        if (a.replies.length === 0) {
+          h += '<div class="ap-warn">No Space post found to reply under: paste one in "Space post URL" below and SCRAPE again.</div>';
+        } else {
+          a.replies.forEach((r) => {
+            h += '<div class="ap-r">';
+            h += '<a href="' + escH(r.parentUrl) + '" target="_blank" rel="noopener">';
+            h += escH(r.username ? '@' + r.username + ' post' : 'Space post') + '</a> ';
+            if (r.status === 'replied') {
+              h += '✅ replied';
+              if (r.replyUrl) h += ' · <a href="' + escH(r.replyUrl) + '" target="_blank" rel="noopener">view reply</a>';
+            } else if (r.status === 'already') {
+              h += '✅ already replied';
+              if (r.replyUrl) h += ' · <a href="' + escH(r.replyUrl) + '" target="_blank" rel="noopener">view reply</a>';
+            } else {
+              h += '⚠️ ' + escH(r.error || r.status);
+            }
+            h += '</div>';
+          });
+        }
+        if (a.replySearch && a.replySearch.error) {
+          h += '<div style="font-size:.75rem;color:#94a3b8;margin-top:.3rem">Search: ' + escH(a.replySearch.error) + '</div>';
+        }
+        h += '</div>';
+      }
     } else if (a.status === 'in_progress') {
       h += '<div class="ap-hint">Posting the watch link…</div>';
     } else {
       h += '<div class="ap-warn">⚠️ Watch link not posted: ' + escH(a.error || a.status) + '</div>';
     }
     apBox.innerHTML = h;
+    lastApKey = (a.spaceId || '') + '|' + (a.url || '') + '|' + ((a.replies || []).length + (a.replies || []).map(r => r.status).join(','));
   }
+  window.__gomlSpacePostUrl = () => (document.getElementById('spacePostUrl') || {}).value || '';
+  async function pollLatest() {
+    try {
+      const res = await api('/api/admin/spaces/autopost-latest');
+      if (res && res.ok && res.latest && res.latest.result && (Date.now() - new Date(res.latest.at).getTime()) < 6 * 3600 * 1000) {
+        const l = res.latest;
+        const newKey = (l.result.spaceId || '') + '|' + (l.result.url || '') + '|' + ((l.result.replies || []).length + (l.result.replies || []).map(r => r.status).join(','));
+        if (newKey && newKey !== lastApKey) {
+          renderAutopost(l.result, { scrapedBy: l.scrapedBy, at: l.at, shared: true });
+        }
+      }
+    } catch { /* ignore */ }
+  }
+  setTimeout(pollLatest, 1500);
+  setInterval(pollLatest, 10000);
   document.addEventListener('click', (ev) => {
     const t = ev.target && ev.target.closest ? ev.target.closest('[data-ap="copy"]') : null;
     if (!t) return;
@@ -1419,7 +1474,6 @@
     if (navigator.clipboard && window.isSecureContext) navigator.clipboard.writeText(i.value).then(ok, () => { document.execCommand('copy'); ok(); });
     else { document.execCommand('copy'); ok(); }
   });
-
   adoptQueryTokens();
   boot();
 })();

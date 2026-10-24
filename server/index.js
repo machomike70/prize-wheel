@@ -504,7 +504,7 @@ app.post('/api/admin/spaces/scrape', requireAdmin, scrapeLimiter, async (req, re
     const names = formatParticipantsForGiveaway(result);
     // Admin tapped SCRAPE: post the watch link ONCE per Space from @GetOffMyLawn70 (AUTOPOST_MODE=live, else simulated).
     const autopost = req.body?.autopost === true
-      ? await spaceAutopost.autopostAfterScrape(result, await adminX.trackingFor(req).catch(() => null))
+      ? await spaceAutopost.autopostAfterScrape(result, await adminX.trackingFor(req).catch(() => null), { spacePostUrl: typeof req.body?.spacePostUrl === 'string' ? req.body.spacePostUrl.slice(0, 300) : undefined })
       : undefined;
     return res.json({
       autopost,
@@ -533,6 +533,11 @@ const spaceDetectLimiter = rateLimit({
   standardHeaders: true,
   legacyHeaders: false,
   message: { error: 'Too many Space lookups; try again shortly' },
+});
+
+// Latest watch-link post + replies for the current Space, for every admin's spin page (not only the one who scraped).
+app.get('/api/admin/spaces/autopost-latest', requireAdmin, (_req, res) => {
+  res.json({ ok: true, latest: spaceAutopost.getLatest() });
 });
 
 app.get('/api/admin/spaces/goml-live', requireAdmin, spaceDetectLimiter, async (req, res) => {
